@@ -1,0 +1,15 @@
+# Python virtual environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Large data files
+data/*.csv
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,1067 @@
+[
+  {
+    "node_idx": 135884,
+    "tx_id": "7134700",
+    "time_step": 35,
+    "true_label": 1,
+    "leaf_idx": 4,
+    "leaf_path_prob": 0.15721403062343597,
+    "leaf_class_probs": [
+      0.4550926983356476,
+      0.54490727186203
+    ],
+    "p_illicit": 0.54490727186203,
+    "path": [
+      {
+        "depth": 0,
+        "node_idx": 0,
+        "direction": "left",
+        "p_right": 0.5358829498291016,
+        "bias": 0.01029648445546627,
+        "beta": 0.9747069478034973,
+        "top_features": [
+          {
+            "feature": "GNN_emb_75",
+            "is_tabular": false,
+            "x_value": 1.840454339981079,
+            "weight": -0.08060530573129654,
+            "contribution": -0.14459815621376038
+          },
+          {
+            "feature": "GNN_emb_11",
+            "is_tabular": false,
+            "x_value": -1.6256868839263916,
+            "weight": -0.07908982038497925,
+            "contribution": 0.12532322108745575
+          },
+          {
+            "feature": "GNN_emb_99",
+            "is_tabular": false,
+            "x_value": -1.0665782690048218,
+            "weight": 0.09661750495433807,
+            "contribution": -0.10044367611408234
+          },
+          {
+            "feature": "GNN_emb_37",
+            "is_tabular": false,
+            "x_value": 1.1320233345031738,
+            "weight": -0.0907655879855156,
+            "contribution": -0.10014993697404861
+          },
+          {
+            "feature": "GNN_emb_34",
+            "is_tabular": false,
+            "x_value": -1.138477087020874,
+            "weight": 0.08288678526878357,
+            "contribution": -0.09197793155908585
+          },
+          {
+            "feature": "GNN_emb_83",
+            "is_tabular": false,
+            "x_value": 0.8652783632278442,
+            "weight": 0.09310069680213928,
+            "contribution": 0.07852046191692352
+          },
+          {
+            "feature": "GNN_emb_63",
+            "is_tabular": false,
+            "x_value": 2.0169050693511963,
+            "weight": 0.03889056295156479,
+            "contribution": 0.07645462453365326
+          },
+          {
+            "feature": "GNN_emb_77",
+            "is_tabular": false,
+            "x_value": 1.916747808456421,
+            "weight": 0.03588733822107315,
+            "contribution": 0.06704714894294739
+          },
+          {
+            "feature": "GNN_emb_74",
+            "is_tabular": false,
+            "x_value": 1.0636285543441772,
+            "weight": 0.06427019834518433,
+            "contribution": 0.06663059443235397
+          },
+          {
+            "feature": "GNN_emb_64",
+            "is_tabular": false,
+            "x_value": 0.8193737864494324,
+            "weight": -0.07593487948179245,
+            "contribution": -0.060645341873168945
+          }
+        ],
+        "top_tabular_features": [],
+        "tabular_share_contrib": 0.0,
+        "tabular_share_weights": 0.0,
+        "graph_share_contrib": 1.0
+      },
+      {
+        "depth": 1,
+        "node_idx": 1,
+        "direction": "right",
+        "p_right": 0.744519829750061,
+        "bias": 0.06849659979343414,
+        "beta": 0.9919993281364441,
+        "top_features": [
+          {
+            "feature": "GNN_emb_14",
+            "is_tabular": false,
+            "x_value": 1.3107177019119263,
+            "weight": 0.11310651898384094,
+            "contribution": 0.14706461131572723
+          },
+          {
+            "feature": "GNN_emb_63",
+            "is_tabular": false,
+            "x_value": 2.0169050693511963,
+            "weight": 0.07093773037195206,
+            "contribution": 0.1419299691915512
+          },
+          {
+            "feature": "GNN_emb_8",
+            "is_tabular": false,
+            "x_value": -1.465197205543518,
+            "weight": 0.0964488759636879,
+            "contribution": -0.14018599689006805
+          },
+          {
+            "feature": "GNN_emb_11",
+            "is_tabular": false,
+            "x_value": -1.6256868839263916,
+            "weight": -0.0735258162021637,
+            "contribution": 0.1185736358165741
+          },
+          {
+            "feature": "GNN_emb_52",
+            "is_tabular": false,
+            "x_value": 1.7464282512664795,
+            "weight": 0.05782517418265343,
+            "contribution": 0.10017954558134079
+          },
+          {
+            "feature": "GNN_emb_26",
+            "is_tabular": false,
+            "x_value": 1.3635071516036987,
+            "weight": 0.07307431846857071,
+            "contribution": 0.09884019196033478
+          },
+          {
+            "feature": "GNN_emb_4",
+            "is_tabular": false,
+            "x_value": -1.184328556060791,
+            "weight": 0.08155205845832825,
+            "contribution": -0.09581169486045837
+          },
+          {
+            "feature": "GNN_emb_88",
+            "is_tabular": false,
+            "x_value": -1.6372761726379395,
+            "weight": -0.05437285453081131,
+            "contribution": 0.08831113576889038
+          },
+          {
+            "feature": "GNN_emb_56",
+            "is_tabular": false,
+            "x_value": -1.2782611846923828,
+            "weight": -0.06814341992139816,
+            "contribution": 0.08640819042921066
+          },
+          {
+            "feature": "GNN_emb_73",
+            "is_tabular": false,
+            "x_value": -1.0220584869384766,
+            "weight": -0.08342920243740082,
+            "contribution": 0.08458731323480606
+          }
+        ],
+        "top_tabular_features": [],
+        "tabular_share_contrib": 0.0,
+        "tabular_share_weights": 0.0,
+        "graph_share_contrib": 1.0
+      },
+      {
+        "depth": 2,
+        "node_idx": 4,
+        "direction": "left",
+        "p_right": 0.27240273356437683,
+        "bias": 0.05778786540031433,
+        "beta": 1.0214015245437622,
+        "top_features": [
+          {
+            "feature": "GNN_emb_77",
+            "is_tabular": false,
+            "x_value": 1.916747808456421,
+            "weight": -0.13246744871139526,
+            "contribution": -0.25934067368507385
+          },
+          {
+            "feature": "GNN_emb_88",
+            "is_tabular": false,
+            "x_value": -1.6372761726379395,
+            "weight": 0.1187082976102829,
+            "contribution": -0.198517844080925
+          },
+          {
+            "feature": "GNN_emb_11",
+            "is_tabular": false,
+            "x_value": -1.6256868839263916,
+            "weight": -0.09104179590940475,
+            "contribution": 0.15117299556732178
+          },
+          {
+            "feature": "GNN_emb_81",
+            "is_tabular": false,
+            "x_value": 1.6020978689193726,
+            "weight": -0.07794354856014252,
+            "contribution": -0.12754566967487335
+          },
+          {
+            "feature": "GNN_emb_87",
+            "is_tabular": false,
+            "x_value": 1.0573735237121582,
+            "weight": -0.11245717853307724,
+            "contribution": -0.12145408242940903
+          },
+          {
+            "feature": "GNN_emb_18",
+            "is_tabular": false,
+            "x_value": -1.1780152320861816,
+            "weight": 0.09293743222951889,
+            "contribution": -0.11182478070259094
+          },
+          {
+            "feature": "GNN_emb_60",
+            "is_tabular": false,
+            "x_value": 1.2050386667251587,
+            "weight": -0.08599075675010681,
+            "contribution": -0.10583985596895218
+          },
+          {
+            "feature": "GNN_emb_9",
+            "is_tabular": false,
+            "x_value": -0.8904154300689697,
+            "weight": 0.10121117532253265,
+            "contribution": -0.09204869717359543
+          },
+          {
+            "feature": "GNN_emb_54",
+            "is_tabular": false,
+            "x_value": -0.8873871564865112,
+            "weight": -0.09639061987400055,
+            "contribution": 0.08736638724803925
+          },
+          {
+            "feature": "GNN_emb_52",
+            "is_tabular": false,
+            "x_value": 1.7464282512664795,
+            "weight": 0.04227042943239212,
+            "contribution": 0.07540218532085419
+          }
+        ],
+        "top_tabular_features": [],
+        "tabular_share_contrib": 0.0,
+        "tabular_share_weights": 0.0,
+        "graph_share_contrib": 1.0
+      },
+      {
+        "depth": 3,
+        "node_idx": 9,
+        "direction": "left",
+        "p_right": 0.37468838691711426,
+        "bias": -0.0652744397521019,
+        "beta": 1.0118470191955566,
+        "top_features": [
+          {
+            "feature": "GNN_emb_8",
+            "is_tabular": false,
+            "x_value": -1.465197205543518,
+            "weight": -0.10725249350070953,
+            "contribution": 0.15900775790214539
+          },
+          {
+            "feature": "GNN_emb_63",
+            "is_tabular": false,
+            "x_value": 2.0169050693511963,
+            "weight": -0.0721185952425003,
+            "contribution": -0.14717958867549896
+          },
+          {
+            "feature": "GNN_emb_81",
+            "is_tabular": false,
+            "x_value": 1.6020978689193726,
+            "weight": -0.06913088262081146,
+            "contribution": -0.11206654459238052
+          },
+          {
+            "feature": "GNN_emb_77",
+            "is_tabular": false,
+            "x_value": 1.916747808456421,
+            "weight": 0.056011863052845,
+            "contribution": 0.10863251984119415
+          },
+          {
+            "feature": "GNN_emb_11",
+            "is_tabular": false,
+            "x_value": -1.6256868839263916,
+            "weight": -0.06080882251262665,
+            "contribution": 0.10002725571393967
+          },
+          {
+            "feature": "GNN_emb_34",
+            "is_tabular": false,
+            "x_value": -1.138477087020874,
+            "weight": 0.0764145702123642,
+            "contribution": -0.08802688121795654
+          },
+          {
+            "feature": "GNN_emb_37",
+            "is_tabular": false,
+            "x_value": 1.1320233345031738,
+            "weight": 0.0716654434800148,
+            "contribution": 0.08208806067705154
+          },
+          {
+            "feature": "GNN_emb_61",
+            "is_tabular": false,
+            "x_value": 0.8647472262382507,
+            "weight": 0.08305727690458298,
+            "contribution": 0.07267444580793381
+          },
+          {
+            "feature": "GNN_emb_18",
+            "is_tabular": false,
+            "x_value": -1.1780152320861816,
+            "weight": -0.060284323990345,
+            "contribution": 0.07185717672109604
+          },
+          {
+            "feature": "GNN_emb_29",
+            "is_tabular": false,
+            "x_value": -0.6427350044250488,
+            "weight": 0.10673222690820694,
+            "contribution": -0.06941324472427368
+          }
+        ],
+        "top_tabular_features": [],
+        "tabular_share_contrib": 0.0,
+        "tabular_share_weights": 0.0,
+        "graph_share_contrib": 1.0
+      }
+    ],
+    "tabular_share_contrib_total": 0.0,
+    "tabular_share_weights_total": 0.0,
+    "n_tabular_features": 0,
+    "n_gnn_features": 100
+  },
+  {
+    "node_idx": 136601,
+    "tx_id": "54759799",
+    "time_step": 35,
+    "true_label": 1,
+    "leaf_idx": 4,
+    "leaf_path_prob": 0.18146774172782898,
+    "leaf_class_probs": [
+      0.4550926983356476,
+      0.54490727186203
+    ],
+    "p_illicit": 0.54490727186203,
+    "path": [
+      {
+        "depth": 0,
+        "node_idx": 0,
+        "direction": "left",
+        "p_right": 0.3781720697879791,
+        "bias": 0.01029648445546627,
+        "beta": 0.9747069478034973,
+        "top_features": [
+          {
+            "feature": "GNN_emb_34",
+            "is_tabular": false,
+            "x_value": -1.0240132808685303,
+            "weight": 0.08288678526878357,
+            "contribution": -0.08273036777973175
+          },
+          {
+            "feature": "GNN_emb_84",
+            "is_tabular": false,
+            "x_value": -0.8672412633895874,
+            "weight": 0.0893910750746727,
+            "contribution": -0.07556281983852386
+          },
+          {
+            "feature": "GNN_emb_39",
+            "is_tabular": false,
+            "x_value": -1.339018702507019,
+            "weight": 0.04672231152653694,
+            "contribution": -0.06097966432571411
+          },
+          {
+            "feature": "GNN_emb_4",
+            "is_tabular": false,
+            "x_value": -1.2921433448791504,
+            "weight": 0.04749971628189087,
+            "contribution": -0.05982404202222824
+          },
+          {
+            "feature": "GNN_emb_75",
+            "is_tabular": false,
+            "x_value": 0.7504098415374756,
+            "weight": -0.08060530573129654,
+            "contribution": -0.05895711109042168
+          },
+          {
+            "feature": "GNN_emb_99",
+            "is_tabular": false,
+            "x_value": -0.6164364218711853,
+            "weight": 0.09661750495433807,
+            "contribution": -0.05805213004350662
+          },
+          {
+            "feature": "GNN_emb_9",
+            "is_tabular": false,
+            "x_value": -1.021244764328003,
+            "weight": -0.055956169962882996,
+            "contribution": 0.05569957569241524
+          },
+          {
+            "feature": "GNN_emb_97",
+            "is_tabular": false,
+            "x_value": 0.6933228373527527,
+            "weight": -0.07920648902654648,
+            "contribution": -0.053526680916547775
+          },
+          {
+            "feature": "GNN_emb_44",
+            "is_tabular": false,
+            "x_value": 0.5743133425712585,
+            "weight": -0.09025413542985916,
+            "contribution": -0.05052310973405838
+          },
+          {
+            "feature": "GNN_emb_36",
+            "is_tabular": false,
+            "x_value": 0.6022453308105469,
+            "weight": -0.08511824905872345,
+            "contribution": -0.049965497106313705
+          }
+        ],
+        "top_tabular_features": [],
+        "tabular_share_contrib": 0.0,
+        "tabular_share_weights": 0.0,
+        "graph_share_contrib": 1.0
+      },
+      {
+        "depth": 1,
+        "node_idx": 1,
+        "direction": "right",
+        "p_right": 0.6210331916809082,
+        "bias": 0.06849659979343414,
+        "beta": 0.9919993281364441,
+        "top_features": [
+          {
+            "feature": "GNN_emb_14",
+            "is_tabular": false,
+            "x_value": 1.4797604084014893,
+            "weight": 0.11310651898384094,
+            "contribution": 0.16603146493434906
+          },
+          {
+            "feature": "GNN_emb_4",
+            "is_tabular": false,
+            "x_value": -1.2921433448791504,
+            "weight": 0.08155205845832825,
+            "contribution": -0.10453386604785919
+          },
+          {
+            "feature": "GNN_emb_88",
+            "is_tabular": false,
+            "x_value": -1.6913790702819824,
+            "weight": -0.05437285453081131,
+            "contribution": 0.09122932702302933
+          },
+          {
+            "feature": "GNN_emb_41",
+            "is_tabular": false,
+            "x_value": -1.30617094039917,
+            "weight": -0.06900890171527863,
+            "contribution": 0.0894162654876709
+          },
+          {
+            "feature": "GNN_emb_9",
+            "is_tabular": false,
+            "x_value": -1.021244764328003,
+            "weight": -0.07670556008815765,
+            "contribution": 0.0777084156870842
+          },
+          {
+            "feature": "GNN_emb_39",
+            "is_tabular": false,
+            "x_value": -1.339018702507019,
+            "weight": 0.05790196731686592,
+            "contribution": -0.07691150903701782
+          },
+          {
+            "feature": "GNN_emb_26",
+            "is_tabular": false,
+            "x_value": 0.927399754524231,
+            "weight": 0.07307431846857071,
+            "contribution": 0.06722690165042877
+          },
+          {
+            "feature": "GNN_emb_42",
+            "is_tabular": false,
+            "x_value": 0.6432763338088989,
+            "weight": -0.09000938385725021,
+            "contribution": -0.05743765830993652
+          },
+          {
+            "feature": "GNN_emb_84",
+            "is_tabular": false,
+            "x_value": -0.8672412633895874,
+            "weight": 0.062416888773441315,
+            "contribution": -0.05369742214679718
+          },
+          {
+            "feature": "GNN_emb_97",
+            "is_tabular": false,
+            "x_value": 0.6933228373527527,
+            "weight": 0.07390058785676956,
+            "contribution": 0.0508270338177681
+          }
+        ],
+        "top_tabular_features": [],
+        "tabular_share_contrib": 0.0,
+        "tabular_share_weights": 0.0,
+        "graph_share_contrib": 1.0
+      },
+      {
+        "depth": 2,
+        "node_idx": 4,
+        "direction": "left",
+        "p_right": 0.2735975384712219,
+        "bias": 0.05778786540031433,
+        "beta": 1.0214015245437622,
+        "top_features": [
+          {
+            "feature": "GNN_emb_88",
+            "is_tabular": false,
+            "x_value": -1.6913790702819824,
+            "weight": 0.1187082976102829,
+            "contribution": -0.20507775247097015
+          },
+          {
+            "feature": "GNN_emb_77",
+            "is_tabular": false,
+            "x_value": 1.2690083980560303,
+            "weight": -0.13246744871139526,
+            "contribution": -0.17169995605945587
+          },
+          {
+            "feature": "GNN_emb_87",
+            "is_tabular": false,
+            "x_value": 1.1322797536849976,
+            "weight": -0.11245717853307724,
+            "contribution": -0.13005810976028442
+          },
+          {
+            "feature": "GNN_emb_9",
+            "is_tabular": false,
+            "x_value": -1.021244764328003,
+            "weight": 0.10121117532253265,
+            "contribution": -0.10557347536087036
+          },
+          {
+            "feature": "GNN_emb_16",
+            "is_tabular": false,
+            "x_value": 0.6596766710281372,
+            "weight": -0.10917118936777115,
+            "contribution": -0.07355897128582001
+          },
+          {
+            "feature": "GNN_emb_95",
+            "is_tabular": false,
+            "x_value": 0.7957309484481812,
+            "weight": -0.08361577987670898,
+            "contribution": -0.06795962899923325
+          },
+          {
+            "feature": "GNN_emb_79",
+            "is_tabular": false,
+            "x_value": -0.8478020429611206,
+            "weight": -0.07664766162633896,
+            "contribution": 0.06637275964021683
+          },
+          {
+            "feature": "GNN_emb_44",
+            "is_tabular": false,
+            "x_value": 0.5743133425712585,
+            "weight": -0.10060075670480728,
+            "contribution": -0.05901286005973816
+          },
+          {
+            "feature": "GNN_emb_45",
+            "is_tabular": false,
+            "x_value": 0.7216026782989502,
+            "weight": -0.07903554290533066,
+            "contribution": -0.058252837508916855
+          },
+          {
+            "feature": "GNN_emb_27",
+            "is_tabular": false,
+            "x_value": -0.8853269219398499,
+            "weight": 0.06403804570436478,
+            "contribution": -0.05790795385837555
+          }
+        ],
+        "top_tabular_features": [],
+        "tabular_share_contrib": 0.0,
+        "tabular_share_weights": 0.0,
+        "graph_share_contrib": 1.0
+      },
+      {
+        "depth": 3,
+        "node_idx": 9,
+        "direction": "left",
+        "p_right": 0.3531001806259155,
+        "bias": -0.0652744397521019,
+        "beta": 1.0118470191955566,
+        "top_features": [
+          {
+            "feature": "GNN_emb_39",
+            "is_tabular": false,
+            "x_value": -1.339018702507019,
+            "weight": 0.06868276745080948,
+            "contribution": -0.0930570513010025
+          },
+          {
+            "feature": "GNN_emb_34",
+            "is_tabular": false,
+            "x_value": -1.0240132808685303,
+            "weight": 0.0764145702123642,
+            "contribution": -0.07917656004428864
+          },
+          {
+            "feature": "GNN_emb_77",
+            "is_tabular": false,
+            "x_value": 1.2690083980560303,
+            "weight": 0.056011863052845,
+            "contribution": 0.07192160189151764
+          },
+          {
+            "feature": "GNN_emb_4",
+            "is_tabular": false,
+            "x_value": -1.2921433448791504,
+            "weight": -0.05281449481844902,
+            "contribution": 0.06905238330364227
+          },
+          {
+            "feature": "GNN_emb_51",
+            "is_tabular": false,
+            "x_value": -0.6715377569198608,
+            "weight": 0.09332334995269775,
+            "contribution": -0.0634126141667366
+          },
+          {
+            "feature": "GNN_emb_29",
+            "is_tabular": false,
+            "x_value": -0.5797443985939026,
+            "weight": 0.10673222690820694,
+            "contribution": -0.06261047720909119
+          },
+          {
+            "feature": "GNN_emb_15",
+            "is_tabular": false,
+            "x_value": -0.47494053840637207,
+            "weight": 0.12123814970254898,
+            "contribution": -0.05826307460665703
+          },
+          {
+            "feature": "GNN_emb_9",
+            "is_tabular": false,
+            "x_value": -1.021244764328003,
+            "weight": 0.050817135721445084,
+            "contribution": -0.0525115542113781
+          },
+          {
+            "feature": "GNN_emb_63",
+            "is_tabular": false,
+            "x_value": 0.7184441685676575,
+            "weight": -0.0721185952425003,
+            "contribution": -0.0524270161986351
+          },
+          {
+            "feature": "GNN_emb_79",
+            "is_tabular": false,
+            "x_value": -0.8478020429611206,
+            "weight": 0.05370558053255081,
+            "contribution": -0.046071115881204605
+          }
+        ],
+        "top_tabular_features": [],
+        "tabular_share_contrib": 0.0,
+        "tabular_share_weights": 0.0,
+        "graph_share_contrib": 1.0
+      }
+    ],
+    "tabular_share_contrib_total": 0.0,
+    "tabular_share_weights_total": 0.0,
+    "n_tabular_features": 0,
+    "n_gnn_features": 100
+  },
+  {
+    "node_idx": 136605,
+    "tx_id": "54760551",
+    "time_step": 35,
+    "true_label": 1,
+    "leaf_idx": 4,
+    "leaf_path_prob": 0.17627237737178802,
+    "leaf_class_probs": [
+      0.4550926983356476,
+      0.54490727186203
+    ],
+    "p_illicit": 0.54490727186203,
+    "path": [
+      {
+        "depth": 0,
+        "node_idx": 0,
+        "direction": "left",
+        "p_right": 0.4057539701461792,
+        "bias": 0.01029648445546627,
+        "beta": 0.9747069478034973,
+        "top_features": [
+          {
+            "feature": "GNN_emb_84",
+            "is_tabular": false,
+            "x_value": -0.8134213089942932,
+            "weight": 0.0893910750746727,
+            "contribution": -0.07087348401546478
+          },
+          {
+            "feature": "GNN_emb_34",
+            "is_tabular": false,
+            "x_value": -0.8506827354431152,
+            "weight": 0.08288678526878357,
+            "contribution": -0.06872693449258804
+          },
+          {
+            "feature": "GNN_emb_11",
+            "is_tabular": false,
+            "x_value": -0.8115905523300171,
+            "weight": -0.07908982038497925,
+            "contribution": 0.06256502121686935
+          },
+          {
+            "feature": "GNN_emb_75",
+            "is_tabular": false,
+            "x_value": 0.773917555809021,
+            "weight": -0.08060530573129654,
+            "contribution": -0.060804031789302826
+          },
+          {
+            "feature": "GNN_emb_44",
+            "is_tabular": false,
+            "x_value": 0.6697263717651367,
+            "weight": -0.09025413542985916,
+            "contribution": -0.05891672149300575
+          },
+          {
+            "feature": "GNN_emb_99",
+            "is_tabular": false,
+            "x_value": -0.5725064277648926,
+            "weight": 0.09661750495433807,
+            "contribution": -0.053915079683065414
+          },
+          {
+            "feature": "GNN_emb_14",
+            "is_tabular": false,
+            "x_value": 1.421581506729126,
+            "weight": 0.034465596079826355,
+            "contribution": 0.04775640368461609
+          },
+          {
+            "feature": "GNN_emb_9",
+            "is_tabular": false,
+            "x_value": -0.8442633152008057,
+            "weight": -0.055956169962882996,
+            "contribution": 0.04604685306549072
+          },
+          {
+            "feature": "GNN_emb_42",
+            "is_tabular": false,
+            "x_value": 0.6203444600105286,
+            "weight": 0.07514523714780807,
+            "contribution": 0.04543687403202057
+          },
+          {
+            "feature": "GNN_emb_77",
+            "is_tabular": false,
+            "x_value": 1.277268886566162,
+            "weight": 0.03588733822107315,
+            "contribution": 0.04467840492725372
+          }
+        ],
+        "top_tabular_features": [],
+        "tabular_share_contrib": 0.0,
+        "tabular_share_weights": 0.0,
+        "graph_share_contrib": 1.0
+      },
+      {
+        "depth": 1,
+        "node_idx": 1,
+        "direction": "right",
+        "p_right": 0.6328298449516296,
+        "bias": 0.06849659979343414,
+        "beta": 0.9919993281364441,
+        "top_features": [
+          {
+            "feature": "GNN_emb_14",
+            "is_tabular": false,
+            "x_value": 1.421581506729126,
+            "weight": 0.11310651898384094,
+            "contribution": 0.15950369834899902
+          },
+          {
+            "feature": "GNN_emb_29",
+            "is_tabular": false,
+            "x_value": -0.8877526521682739,
+            "weight": -0.08725666254758835,
+            "contribution": 0.07684257626533508
+          },
+          {
+            "feature": "GNN_emb_4",
+            "is_tabular": false,
+            "x_value": -0.8809211850166321,
+            "weight": 0.08155205845832825,
+            "contribution": -0.07126615941524506
+          },
+          {
+            "feature": "GNN_emb_26",
+            "is_tabular": false,
+            "x_value": 0.9637913703918457,
+            "weight": 0.07307431846857071,
+            "contribution": 0.06986492872238159
+          },
+          {
+            "feature": "GNN_emb_88",
+            "is_tabular": false,
+            "x_value": -1.2952214479446411,
+            "weight": -0.05437285453081131,
+            "contribution": 0.06986144185066223
+          },
+          {
+            "feature": "GNN_emb_63",
+            "is_tabular": false,
+            "x_value": 0.9541257619857788,
+            "weight": 0.07093773037195206,
+            "contribution": 0.06714200228452682
+          },
+          {
+            "feature": "GNN_emb_9",
+            "is_tabular": false,
+            "x_value": -0.8442633152008057,
+            "weight": -0.07670556008815765,
+            "contribution": 0.06424157321453094
+          },
+          {
+            "feature": "GNN_emb_41",
+            "is_tabular": false,
+            "x_value": -0.9377855062484741,
+            "weight": -0.06900890171527863,
+            "contribution": 0.06419777870178223
+          },
+          {
+            "feature": "GNN_emb_11",
+            "is_tabular": false,
+            "x_value": -0.8115905523300171,
+            "weight": -0.0735258162021637,
+            "contribution": 0.05919543653726578
+          },
+          {
+            "feature": "GNN_emb_42",
+            "is_tabular": false,
+            "x_value": 0.6203444600105286,
+            "weight": -0.09000938385725021,
+            "contribution": -0.05539008975028992
+          }
+        ],
+        "top_tabular_features": [],
+        "tabular_share_contrib": 0.0,
+        "tabular_share_weights": 0.0,
+        "graph_share_contrib": 1.0
+      },
+      {
+        "depth": 2,
+        "node_idx": 4,
+        "direction": "left",
+        "p_right": 0.27895328402519226,
+        "bias": 0.05778786540031433,
+        "beta": 1.0214015245437622,
+        "top_features": [
+          {
+            "feature": "GNN_emb_77",
+            "is_tabular": false,
+            "x_value": 1.277268886566162,
+            "weight": -0.13246744871139526,
+            "contribution": -0.17281760275363922
+          },
+          {
+            "feature": "GNN_emb_88",
+            "is_tabular": false,
+            "x_value": -1.2952214479446411,
+            "weight": 0.1187082976102829,
+            "contribution": -0.15704409778118134
+          },
+          {
+            "feature": "GNN_emb_87",
+            "is_tabular": false,
+            "x_value": 0.9416413307189941,
+            "weight": -0.11245717853307724,
+            "contribution": -0.10816062986850739
+          },
+          {
+            "feature": "GNN_emb_9",
+            "is_tabular": false,
+            "x_value": -0.8442633152008057,
+            "weight": 0.10121117532253265,
+            "contribution": -0.0872776210308075
+          },
+          {
+            "feature": "GNN_emb_11",
+            "is_tabular": false,
+            "x_value": -0.8115905523300171,
+            "weight": -0.09104179590940475,
+            "contribution": 0.07546999305486679
+          },
+          {
+            "feature": "GNN_emb_44",
+            "is_tabular": false,
+            "x_value": 0.6697263717651367,
+            "weight": -0.10060075670480728,
+            "contribution": -0.0688169077038765
+          },
+          {
+            "feature": "GNN_emb_81",
+            "is_tabular": false,
+            "x_value": 0.8073403239250183,
+            "weight": -0.07794354856014252,
+            "contribution": -0.06427370011806488
+          },
+          {
+            "feature": "GNN_emb_18",
+            "is_tabular": false,
+            "x_value": -0.6709536910057068,
+            "weight": 0.09293743222951889,
+            "contribution": -0.06369124352931976
+          },
+          {
+            "feature": "GNN_emb_79",
+            "is_tabular": false,
+            "x_value": -0.7860423922538757,
+            "weight": -0.07664766162633896,
+            "contribution": 0.061537716537714005
+          },
+          {
+            "feature": "GNN_emb_27",
+            "is_tabular": false,
+            "x_value": -0.9348745942115784,
+            "weight": 0.06403804570436478,
+            "contribution": -0.06114879995584488
+          }
+        ],
+        "top_tabular_features": [],
+        "tabular_share_contrib": 0.0,
+        "tabular_share_weights": 0.0,
+        "graph_share_contrib": 1.0
+      },
+      {
+        "depth": 3,
+        "node_idx": 9,
+        "direction": "left",
+        "p_right": 0.34991875290870667,
+        "bias": -0.0652744397521019,
+        "beta": 1.0118470191955566,
+        "top_features": [
+          {
+            "feature": "GNN_emb_29",
+            "is_tabular": false,
+            "x_value": -0.8877526521682739,
+            "weight": 0.10673222690820694,
+            "contribution": -0.0958743467926979
+          },
+          {
+            "feature": "GNN_emb_77",
+            "is_tabular": false,
+            "x_value": 1.277268886566162,
+            "weight": 0.056011863052845,
+            "contribution": 0.07238977402448654
+          },
+          {
+            "feature": "GNN_emb_63",
+            "is_tabular": false,
+            "x_value": 0.9541257619857788,
+            "weight": -0.0721185952425003,
+            "contribution": -0.06962540745735168
+          },
+          {
+            "feature": "GNN_emb_51",
+            "is_tabular": false,
+            "x_value": -0.6996230483055115,
+            "weight": 0.09332334995269775,
+            "contribution": -0.06606467068195343
+          },
+          {
+            "feature": "GNN_emb_34",
+            "is_tabular": false,
+            "x_value": -0.8506827354431152,
+            "weight": 0.0764145702123642,
+            "contribution": -0.06577466428279877
+          },
+          {
+            "feature": "GNN_emb_39",
+            "is_tabular": false,
+            "x_value": -0.9101869463920593,
+            "weight": 0.06868276745080948,
+            "contribution": -0.06325476616621017
+          },
+          {
+            "feature": "GNN_emb_81",
+            "is_tabular": false,
+            "x_value": 0.8073403239250183,
+            "weight": -0.06913088262081146,
+            "contribution": -0.05647335946559906
+          },
+          {
+            "feature": "GNN_emb_11",
+            "is_tabular": false,
+            "x_value": -0.8115905523300171,
+            "weight": -0.06080882251262665,
+            "contribution": 0.04993654042482376
+          },
+          {
+            "feature": "GNN_emb_4",
+            "is_tabular": false,
+            "x_value": -0.8809211850166321,
+            "weight": -0.05281449481844902,
+            "contribution": 0.047076594084501266
+          },
+          {
+            "feature": "GNN_emb_98",
+            "is_tabular": false,
+            "x_value": -0.8174988627433777,
+            "weight": -0.055287398397922516,
+            "contribution": 0.04573284089565277
+          }
+        ],
+        "top_tabular_features": [],
+        "tabular_share_contrib": 0.0,
+        "tabular_share_weights": 0.0,
+        "graph_share_contrib": 1.0
+      }
+    ],
+    "tabular_share_contrib_total": 0.0,
+    "tabular_share_weights_total": 0.0,
+    "n_tabular_features": 0,
+    "n_gnn_features": 100
+  }
+]

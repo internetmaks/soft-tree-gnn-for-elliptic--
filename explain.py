@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from models import EMBED_DIM, EndToEndGNNSoftTree
+from models import EMBED_DIM, DifferentiableSoftDecisionForest, EndToEndGNNSoftTree
 
 
 def _tree_feature_names(model: EndToEndGNNSoftTree, feature_names: List[str]) -> List[str]:
@@ -51,12 +51,34 @@ def explain_node(model: EndToEndGNNSoftTree, data, node_idx: int, top_k: int = 1
 
     Wpływ cechy j w węźle i: c_ij = z_j * w_ij (znak: dodatni -> ku prawej gałęzi). Na
     ścieżce raportujemy też udział cech tabelarycznych vs 100 cech osadzenia GNN
-    w sumie |c_ij| (oraz w normie L1 filtru |w_ij|).
+    w sumie |c_ij| (oraz w normie L1 filtru |w_ij|) oraz diagnostykę skali aktywacji
+    (weryfikacja efektu `normalize_emb` / `nn.LayerNorm`).
+    Dla lasu miękkich drzew (`DifferentiableSoftDecisionForest`) wybierane jest drzewo
+    reprezentatywne o najwyższej pewności dla klasy dominującej, a prawdopodobieństwo
+    końcowe pochodzi z uśrednienia komitetu drzew.
     """
     model.eval()
-    tree = model.tree
     z_all, _ = model.get_tree_input(data.x, data.edge_index)
     z = z_all[node_idx].unsqueeze(0)
+
+    is_forest = isinstance(model.tree, DifferentiableSoftDecisionForest)
+    if is_forest:
+        forest = model.tree
+        ensemble_probs = forest.predict_probs(z, mode='max_path_leaf')[0]
+        best_tree_idx = 0
+        best_score = -1.0
+        for idx_t, t_mod in enumerate(forest.trees):
+            l_pp_t, l_q_t, _, _ = t_mod(z)
+            l_idx_t = int(torch.argmax(l_pp_t, dim=1).item())
+            score_t = float(l_q_t[l_idx_t, 1].item() * l_pp_t[0, l_idx_t].item())
+            if score_t > best_score:
+                best_score = score_t
+                best_tree_idx = idx_t
+        tree = forest.trees[best_tree_idx]
+    else:
+        tree = model.tree
+        best_tree_idx = 0
+        ensemble_probs = None
 
     leaf_pp, leaf_q, _, p_right = tree(z)
     leaf_idx = int(torch.argmax(leaf_pp, dim=1).item())
@@ -113,7 +135,11 @@ def explain_node(model: EndToEndGNNSoftTree, data, node_idx: int, top_k: int = 1
             'graph_share_contrib': 1.0 - share_tab if n_tab > 0 else 1.0,
         })
 
-    probs = leaf_q[leaf_idx]
+    probs = ensemble_probs if ensemble_probs is not None else leaf_q[leaf_idx]
+    tab_mean_abs = float(z_vec[:n_tab].abs().mean().item()) if n_tab > 0 else 0.0
+    gnn_mean_abs = float(z_vec[n_tab:].abs().mean().item())
+    gnn_max_abs = float(z_vec[n_tab:].abs().max().item())
+
     result = {
         'node_idx': node_idx,
         'tx_id': data.tx_ids[node_idx] if hasattr(data, 'tx_ids') else None,
@@ -123,6 +149,12 @@ def explain_node(model: EndToEndGNNSoftTree, data, node_idx: int, top_k: int = 1
         'leaf_path_prob': float(leaf_pp[0, leaf_idx].item()),
         'leaf_class_probs': probs.cpu().tolist(),
         'p_illicit': float(probs[1].item()),
+        'is_forest': is_forest,
+        'tree_idx': best_tree_idx,
+        'normalize_emb': bool(getattr(model, 'normalize_emb', False)),
+        'tabular_mean_abs': tab_mean_abs,
+        'gnn_mean_abs': gnn_mean_abs,
+        'gnn_max_abs': gnn_max_abs,
         'path': steps,
         'tabular_share_contrib_total': tot_abs_tab / (tot_abs_all + 1e-12) if n_tab > 0 else 0.0,
         'tabular_share_weights_total': tot_w_tab / (tot_w_all + 1e-12) if n_tab > 0 else 0.0,
@@ -139,8 +171,11 @@ def print_explanation(res: Dict) -> None:
     print("=" * 78)
     print(f"Węzeł {res['node_idx']} (txId={res['tx_id']}, krok {res['time_step']}, "
           f"etykieta={res['true_label']})")
-    print(f"Liść {res['leaf_idx']} | P(ścieżki)={res['leaf_path_prob']:.3f} | "
-          f"P(illicit)={res['p_illicit']:.3f}")
+    forest_info = f" [Las: drzewo #{res['tree_idx']}]" if res.get('is_forest') else ""
+    print(f"Liść {res['leaf_idx']}{forest_info} | P(ścieżki)={res['leaf_path_prob']:.3f} | "
+          f"P(illicit)={res['p_illicit']:.3f} | LayerNorm={res.get('normalize_emb', False)}")
+    print(f"  Skala wejścia drzewa: |X_tab|_mean={res.get('tabular_mean_abs', 0.0):.3f}, "
+          f"|H_gnn|_mean={res.get('gnn_mean_abs', 0.0):.3f}, |H_gnn|_max={res.get('gnn_max_abs', 0.0):.3f}")
     for s in res['path']:
         print(f"  [głębokość {s['depth']}] węzeł {s['node_idx']:2d} -> {s['direction']:5s} "
               f"(p_right={s['p_right']:.3f}, beta={s['beta']:.2f})")
