@@ -79,11 +79,11 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument('--seed', type=int, default=42)
     p.add_argument('--device', type=str, default='auto',
                    help="'auto', 'rocm'/'cuda' (ROCm/CUDA), 'dml' (DirectML) lub 'cpu'")
-    p.add_argument('--grad_checkpoint', type=str2bool, default=False,
-                   help='checkpointing gradientów warstw GNN (mniejsze zużycie VRAM, np. dla --backbone gat)')
+    p.add_argument('--grad_checkpoint', type=str2bool, default=None,
+                   help='checkpointing gradientów warstw GNN (domyślnie True na GPU dla GAT, oszczędza >10 GB VRAM)')
     p.add_argument('--gat_head_chunk', type=int, default=None,
                    help='liczba głowic GAT liczonych naraz (0 = standardowy GATConv); '
-                        'domyślnie 4 na GPU (DirectML/ROCm/CUDA, oszczędza VRAM), 0 na CPU')
+                        'domyślnie 2 na GPU (DirectML/ROCm/CUDA, oszczędza VRAM), 0 na CPU')
     # Wyjścia
     p.add_argument('--output_dir', type=str, default='results')
     p.add_argument('--explain_nodes', type=int, default=3, help='liczba węzłów illicit do wyjaśnienia (0 = pomiń)')
@@ -171,13 +171,17 @@ def run_experiment(args: argparse.Namespace, data=None, tag: str = None,
         print(f"[{tag}] węzły={data.num_nodes}, krawędzie={data.edge_index.size(1)}, "
               f"cechy={data.x.size(1)}, urządzenie={describe_device(device)}")
 
+    is_gpu = device.type in ('privateuseone', 'cuda')
     gat_head_chunk = args.gat_head_chunk
     if gat_head_chunk is None:
-        gat_head_chunk = 4 if device.type in ('privateuseone', 'cuda') else 0
+        gat_head_chunk = 2 if is_gpu else 0
+    grad_ckpt = args.grad_checkpoint
+    if grad_ckpt is None:
+        grad_ckpt = is_gpu and (args.backbone in ('gat', 'gat_resnet'))
     model = EndToEndGNNSoftTree(
         in_channels=data.x.size(1), backbone=args.backbone, tree_depth=args.tree_depth,
         use_skip=args.use_skip, penalty_lambda=args.penalty_lambda,
-        grad_checkpoint=args.grad_checkpoint, gat_head_chunk=gat_head_chunk,
+        grad_checkpoint=grad_ckpt, gat_head_chunk=gat_head_chunk,
         normalize_emb=args.normalize_emb, asymmetric_features=args.asymmetric_features,
         num_trees=args.num_trees, feature_dropout=args.feature_dropout).to(device)
 
@@ -320,10 +324,11 @@ def ablation_grid(args: argparse.Namespace):
 
 def run_with_fallback(args: argparse.Namespace, make_data=lambda: None, tag: str = None,
                       soft_targets: torch.Tensor = None) -> dict:
-    """Uruchamia eksperyment; przy braku pamięci GPU powtarza go na CPU.
+    """Uruchamia eksperyment; przy braku pamięci GPU najpierw ponawia na GPU z checkpointingiem
+    i gat_head_chunk=1, a w ostateczności powtarza na CPU.
 
     Pełny graf Elliptic (204 tys. węzłów) z 8-głowicowym GAT potrafi przekroczyć 16 GB VRAM
-    (np. Radeon RX 6950 XT) w trybie full-batch.
+    (np. Radeon RX 6950 XT) w trybie full-batch bez checkpointingu.
     """
     try:
         return run_experiment(args, data=make_data(), tag=tag, soft_targets=soft_targets)
@@ -331,6 +336,21 @@ def run_with_fallback(args: argparse.Namespace, make_data=lambda: None, tag: str
         msg = str(e).lower()
         if args.device == 'cpu' or not ('video memory' in msg or 'out of memory' in msg):
             raise
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        if not args.grad_checkpoint or (args.gat_head_chunk != 1):
+            print(f"\n[device] Brak pamięci VRAM ({str(e).strip()[:80]}...). "
+                  f"Ponawiam na GPU z --grad_checkpoint True --gat_head_chunk 1.")
+            low_vram_args = argparse.Namespace(
+                **{**vars(args), 'grad_checkpoint': True, 'gat_head_chunk': 1})
+            try:
+                return run_experiment(low_vram_args, data=make_data(), tag=tag, soft_targets=soft_targets)
+            except RuntimeError as e2:
+                msg2 = str(e2).lower()
+                if not ('video memory' in msg2 or 'out of memory' in msg2):
+                    raise
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
         print(f"\n[device] Brak pamięci GPU ({str(e).strip()[:90]}...). "
               f"Powtarzam eksperyment na CPU (wymuś bez fallbacku: --device cpu).")
         cpu_args = argparse.Namespace(**{**vars(args), 'device': 'cpu', 'gat_head_chunk': 0})
