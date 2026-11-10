@@ -1,0 +1,601 @@
+[
+  {
+    "node_idx": 168532,
+    "tx_id": "72015069",
+    "time_step": 42,
+    "true_label": 1,
+    "leaf_idx": 14,
+    "leaf_path_prob": 0.10077159851789474,
+    "leaf_class_probs": [
+      0.49042144417762756,
+      0.50957852602005
+    ],
+    "p_illicit": 0.50957852602005,
+    "path": [
+      {
+        "depth": 0,
+        "node_idx": 0,
+        "direction": "right",
+        "p_right": 0.5815558433532715,
+        "bias": 0.031030792742967606,
+        "beta": 1.0029689073562622,
+        "top_features": [
+          {
+            "feature": "Aggregate_feature_50",
+            "is_tabular": true,
+            "x_value": 4.012478828430176,
+            "weight": -0.05564749985933304,
+            "contribution": -0.22394731640815735
+          },
+          {
+            "feature": "Aggregate_feature_7",
+            "is_tabular": true,
+            "x_value": 3.270965814590454,
+            "weight": 0.05495312809944153,
+            "contribution": 0.18028345704078674
+          },
+          {
+            "feature": "Aggregate_feature_8",
+            "is_tabular": true,
+            "x_value": 3.438671827316284,
+            "weight": 0.05078890547156334,
+            "contribution": 0.17516489326953888
+          },
+          {
+            "feature": "Aggregate_feature_10",
+            "is_tabular": true,
+            "x_value": 3.4184460639953613,
+            "weight": -0.032954905182123184,
+            "contribution": -0.11298903077840805
+          },
+          {
+            "feature": "Aggregate_feature_63",
+            "is_tabular": true,
+            "x_value": 1.8375961780548096,
+            "weight": 0.058722980320453644,
+            "contribution": 0.10822949558496475
+          },
+          {
+            "feature": "Aggregate_feature_46",
+            "is_tabular": true,
+            "x_value": 2.607316732406616,
+            "weight": -0.03826165571808815,
+            "contribution": -0.10005643218755722
+          },
+          {
+            "feature": "GNN_emb_75",
+            "is_tabular": false,
+            "x_value": 1.6976392269134521,
+            "weight": 0.05648551136255264,
+            "contribution": 0.09617671370506287
+          },
+          {
+            "feature": "Aggregate_feature_54",
+            "is_tabular": true,
+            "x_value": 1.357785940170288,
+            "weight": 0.0517360083758831,
+            "contribution": 0.07045498490333557
+          },
+          {
+            "feature": "Aggregate_feature_47",
+            "is_tabular": true,
+            "x_value": 1.3689502477645874,
+            "weight": 0.05080752074718475,
+            "contribution": 0.06975945830345154
+          },
+          {
+            "feature": "Aggregate_feature_55",
+            "is_tabular": true,
+            "x_value": 1.8057399988174438,
+            "weight": 0.035267628729343414,
+            "contribution": 0.06387323886156082
+          }
+        ],
+        "top_tabular_features": [
+          {
+            "feature": "Aggregate_feature_50",
+            "x_value": 4.012478828430176,
+            "weight": -0.05564749985933304,
+            "contribution": -0.22394731640815735
+          },
+          {
+            "feature": "Aggregate_feature_7",
+            "x_value": 3.270965814590454,
+            "weight": 0.05495312809944153,
+            "contribution": 0.18028345704078674
+          },
+          {
+            "feature": "Aggregate_feature_8",
+            "x_value": 3.438671827316284,
+            "weight": 0.05078890547156334,
+            "contribution": 0.17516489326953888
+          },
+          {
+            "feature": "Aggregate_feature_10",
+            "x_value": 3.4184460639953613,
+            "weight": -0.032954905182123184,
+            "contribution": -0.11298903077840805
+          },
+          {
+            "feature": "Aggregate_feature_63",
+            "x_value": 1.8375961780548096,
+            "weight": 0.058722980320453644,
+            "contribution": 0.10822949558496475
+          },
+          {
+            "feature": "Aggregate_feature_46",
+            "x_value": 2.607316732406616,
+            "weight": -0.03826165571808815,
+            "contribution": -0.10005643218755722
+          },
+          {
+            "feature": "Aggregate_feature_54",
+            "x_value": 1.357785940170288,
+            "weight": 0.0517360083758831,
+            "contribution": 0.07045498490333557
+          },
+          {
+            "feature": "Aggregate_feature_47",
+            "x_value": 1.3689502477645874,
+            "weight": 0.05080752074718475,
+            "contribution": 0.06975945830345154
+          },
+          {
+            "feature": "Aggregate_feature_55",
+            "x_value": 1.8057399988174438,
+            "weight": 0.035267628729343414,
+            "contribution": 0.06387323886156082
+          },
+          {
+            "feature": "Aggregate_feature_16",
+            "x_value": 1.0341811180114746,
+            "weight": 0.060772646218538284,
+            "contribution": 0.06303651630878448
+          }
+        ],
+        "tabular_share_contrib": 0.6523107290267944,
+        "tabular_share_weights": 0.6421146988868713,
+        "graph_share_contrib": 0.34768927097320557
+      },
+      {
+        "depth": 1,
+        "node_idx": 2,
+        "direction": "right",
+        "p_right": 0.5235418081283569,
+        "bias": 0.03151838481426239,
+        "beta": 1.002856731414795,
+        "top_features": [
+          {
+            "feature": "Aggregate_feature_52",
+            "is_tabular": true,
+            "x_value": 4.486931800842285,
+            "weight": 0.05540025606751442,
+            "contribution": 0.24928729236125946
+          },
+          {
+            "feature": "Aggregate_feature_50",
+            "is_tabular": true,
+            "x_value": 4.012478828430176,
+            "weight": 0.05627228319644928,
+            "contribution": 0.22643637657165527
+          },
+          {
+            "feature": "Aggregate_feature_7",
+            "is_tabular": true,
+            "x_value": 3.270965814590454,
+            "weight": -0.04952477291226387,
+            "contribution": -0.16245661675930023
+          },
+          {
+            "feature": "Aggregate_feature_46",
+            "is_tabular": true,
+            "x_value": 2.607316732406616,
+            "weight": 0.05744241923093796,
+            "contribution": 0.15019844472408295
+          },
+          {
+            "feature": "Aggregate_feature_10",
+            "is_tabular": true,
+            "x_value": 3.4184460639953613,
+            "weight": -0.03487923741340637,
+            "contribution": -0.11957340687513351
+          },
+          {
+            "feature": "GNN_emb_63",
+            "is_tabular": false,
+            "x_value": 1.6577852964401245,
+            "weight": -0.05592477694153786,
+            "contribution": -0.09297612309455872
+          },
+          {
+            "feature": "Aggregate_feature_43",
+            "is_tabular": true,
+            "x_value": 2.94889760017395,
+            "weight": -0.029581598937511444,
+            "contribution": -0.08748230338096619
+          },
+          {
+            "feature": "Aggregate_feature_13",
+            "is_tabular": true,
+            "x_value": 1.2795321941375732,
+            "weight": 0.056179534643888474,
+            "contribution": 0.07208887487649918
+          },
+          {
+            "feature": "GNN_emb_94",
+            "is_tabular": false,
+            "x_value": -1.1149510145187378,
+            "weight": 0.06202599033713341,
+            "contribution": -0.06935349851846695
+          },
+          {
+            "feature": "Aggregate_feature_47",
+            "is_tabular": true,
+            "x_value": 1.3689502477645874,
+            "weight": 0.0493132546544075,
+            "contribution": 0.06770024448633194
+          }
+        ],
+        "top_tabular_features": [
+          {
+            "feature": "Aggregate_feature_52",
+            "x_value": 4.486931800842285,
+            "weight": 0.05540025606751442,
+            "contribution": 0.24928729236125946
+          },
+          {
+            "feature": "Aggregate_feature_50",
+            "x_value": 4.012478828430176,
+            "weight": 0.05627228319644928,
+            "contribution": 0.22643637657165527
+          },
+          {
+            "feature": "Aggregate_feature_7",
+            "x_value": 3.270965814590454,
+            "weight": -0.04952477291226387,
+            "contribution": -0.16245661675930023
+          },
+          {
+            "feature": "Aggregate_feature_46",
+            "x_value": 2.607316732406616,
+            "weight": 0.05744241923093796,
+            "contribution": 0.15019844472408295
+          },
+          {
+            "feature": "Aggregate_feature_10",
+            "x_value": 3.4184460639953613,
+            "weight": -0.03487923741340637,
+            "contribution": -0.11957340687513351
+          },
+          {
+            "feature": "Aggregate_feature_43",
+            "x_value": 2.94889760017395,
+            "weight": -0.029581598937511444,
+            "contribution": -0.08748230338096619
+          },
+          {
+            "feature": "Aggregate_feature_13",
+            "x_value": 1.2795321941375732,
+            "weight": 0.056179534643888474,
+            "contribution": 0.07208887487649918
+          },
+          {
+            "feature": "Aggregate_feature_47",
+            "x_value": 1.3689502477645874,
+            "weight": 0.0493132546544075,
+            "contribution": 0.06770024448633194
+          },
+          {
+            "feature": "Aggregate_feature_51",
+            "x_value": 5.323169708251953,
+            "weight": -0.012068821117281914,
+            "contribution": -0.06442791223526001
+          },
+          {
+            "feature": "Aggregate_feature_63",
+            "x_value": 1.8375961780548096,
+            "weight": -0.034369200468063354,
+            "contribution": -0.06333713233470917
+          }
+        ],
+        "tabular_share_contrib": 0.6915947198867798,
+        "tabular_share_weights": 0.6628202795982361,
+        "graph_share_contrib": 0.3084052801132202
+      },
+      {
+        "depth": 2,
+        "node_idx": 6,
+        "direction": "right",
+        "p_right": 0.6234686970710754,
+        "bias": 0.012075142934918404,
+        "beta": 0.9982280731201172,
+        "top_features": [
+          {
+            "feature": "Aggregate_feature_51",
+            "is_tabular": true,
+            "x_value": 5.323169708251953,
+            "weight": 0.045980054885149,
+            "contribution": 0.2443259358406067
+          },
+          {
+            "feature": "Aggregate_feature_8",
+            "is_tabular": true,
+            "x_value": 3.438671827316284,
+            "weight": -0.061543770134449005,
+            "contribution": -0.2112538367509842
+          },
+          {
+            "feature": "Aggregate_feature_7",
+            "is_tabular": true,
+            "x_value": 3.270965814590454,
+            "weight": 0.05423768237233162,
+            "contribution": 0.17709524929523468
+          },
+          {
+            "feature": "Aggregate_feature_52",
+            "is_tabular": true,
+            "x_value": 4.486931800842285,
+            "weight": 0.033352505415678024,
+            "contribution": 0.1493852436542511
+          },
+          {
+            "feature": "Aggregate_feature_50",
+            "is_tabular": true,
+            "x_value": 4.012478828430176,
+            "weight": -0.03497704863548279,
+            "contribution": -0.14009597897529602
+          },
+          {
+            "feature": "Aggregate_feature_44",
+            "is_tabular": true,
+            "x_value": 1.7879256010055542,
+            "weight": -0.05910218507051468,
+            "contribution": -0.10548307001590729
+          },
+          {
+            "feature": "Aggregate_feature_46",
+            "is_tabular": true,
+            "x_value": 2.607316732406616,
+            "weight": -0.03624825179576874,
+            "contribution": -0.09434320777654648
+          },
+          {
+            "feature": "GNN_emb_75",
+            "is_tabular": false,
+            "x_value": 1.6976392269134521,
+            "weight": -0.052877768874168396,
+            "contribution": -0.08960831165313721
+          },
+          {
+            "feature": "Aggregate_feature_55",
+            "is_tabular": true,
+            "x_value": 1.8057399988174438,
+            "weight": 0.04748990759253502,
+            "contribution": 0.08560247719287872
+          },
+          {
+            "feature": "Aggregate_feature_54",
+            "is_tabular": true,
+            "x_value": 1.357785940170288,
+            "weight": 0.0598062165081501,
+            "contribution": 0.08106015622615814
+          }
+        ],
+        "top_tabular_features": [
+          {
+            "feature": "Aggregate_feature_51",
+            "x_value": 5.323169708251953,
+            "weight": 0.045980054885149,
+            "contribution": 0.2443259358406067
+          },
+          {
+            "feature": "Aggregate_feature_8",
+            "x_value": 3.438671827316284,
+            "weight": -0.061543770134449005,
+            "contribution": -0.2112538367509842
+          },
+          {
+            "feature": "Aggregate_feature_7",
+            "x_value": 3.270965814590454,
+            "weight": 0.05423768237233162,
+            "contribution": 0.17709524929523468
+          },
+          {
+            "feature": "Aggregate_feature_52",
+            "x_value": 4.486931800842285,
+            "weight": 0.033352505415678024,
+            "contribution": 0.1493852436542511
+          },
+          {
+            "feature": "Aggregate_feature_50",
+            "x_value": 4.012478828430176,
+            "weight": -0.03497704863548279,
+            "contribution": -0.14009597897529602
+          },
+          {
+            "feature": "Aggregate_feature_44",
+            "x_value": 1.7879256010055542,
+            "weight": -0.05910218507051468,
+            "contribution": -0.10548307001590729
+          },
+          {
+            "feature": "Aggregate_feature_46",
+            "x_value": 2.607316732406616,
+            "weight": -0.03624825179576874,
+            "contribution": -0.09434320777654648
+          },
+          {
+            "feature": "Aggregate_feature_55",
+            "x_value": 1.8057399988174438,
+            "weight": 0.04748990759253502,
+            "contribution": 0.08560247719287872
+          },
+          {
+            "feature": "Aggregate_feature_54",
+            "x_value": 1.357785940170288,
+            "weight": 0.0598062165081501,
+            "contribution": 0.08106015622615814
+          },
+          {
+            "feature": "Aggregate_feature_62",
+            "x_value": 1.4097172021865845,
+            "weight": 0.054144058376550674,
+            "contribution": 0.07619255781173706
+          }
+        ],
+        "tabular_share_contrib": 0.6789789795875549,
+        "tabular_share_weights": 0.6620503067970276,
+        "graph_share_contrib": 0.32102102041244507
+      },
+      {
+        "depth": 3,
+        "node_idx": 14,
+        "direction": "left",
+        "p_right": 0.4691391587257385,
+        "bias": 0.05688680335879326,
+        "beta": 1.0027995109558105,
+        "top_features": [
+          {
+            "feature": "Aggregate_feature_51",
+            "is_tabular": true,
+            "x_value": 5.323169708251953,
+            "weight": 0.049916356801986694,
+            "contribution": 0.26645711064338684
+          },
+          {
+            "feature": "Aggregate_feature_52",
+            "is_tabular": true,
+            "x_value": 4.486931800842285,
+            "weight": -0.047016892582178116,
+            "contribution": -0.2115521878004074
+          },
+          {
+            "feature": "Aggregate_feature_43",
+            "is_tabular": true,
+            "x_value": 2.94889760017395,
+            "weight": -0.0542016364634037,
+            "contribution": -0.16028253734111786
+          },
+          {
+            "feature": "Aggregate_feature_10",
+            "is_tabular": true,
+            "x_value": 3.4184460639953613,
+            "weight": 0.04303363710641861,
+            "contribution": 0.1475200057029724
+          },
+          {
+            "feature": "Aggregate_feature_8",
+            "is_tabular": true,
+            "x_value": 3.438671827316284,
+            "weight": -0.03696509450674057,
+            "contribution": -0.12746667861938477
+          },
+          {
+            "feature": "Aggregate_feature_50",
+            "is_tabular": true,
+            "x_value": 4.012478828430176,
+            "weight": 0.02940213680267334,
+            "contribution": 0.11830572783946991
+          },
+          {
+            "feature": "Aggregate_feature_63",
+            "is_tabular": true,
+            "x_value": 1.8375961780548096,
+            "weight": -0.04885386675596237,
+            "contribution": -0.09002500027418137
+          },
+          {
+            "feature": "Aggregate_feature_54",
+            "is_tabular": true,
+            "x_value": 1.357785940170288,
+            "weight": 0.06088268756866455,
+            "contribution": 0.08289708197116852
+          },
+          {
+            "feature": "Aggregate_feature_65",
+            "is_tabular": true,
+            "x_value": 1.512734293937683,
+            "weight": -0.05173451080918312,
+            "contribution": -0.07847966253757477
+          },
+          {
+            "feature": "Local_feature_20",
+            "is_tabular": true,
+            "x_value": -1.3791478872299194,
+            "weight": 0.05556138604879379,
+            "contribution": -0.07684188336133957
+          }
+        ],
+        "top_tabular_features": [
+          {
+            "feature": "Aggregate_feature_51",
+            "x_value": 5.323169708251953,
+            "weight": 0.049916356801986694,
+            "contribution": 0.26645711064338684
+          },
+          {
+            "feature": "Aggregate_feature_52",
+            "x_value": 4.486931800842285,
+            "weight": -0.047016892582178116,
+            "contribution": -0.2115521878004074
+          },
+          {
+            "feature": "Aggregate_feature_43",
+            "x_value": 2.94889760017395,
+            "weight": -0.0542016364634037,
+            "contribution": -0.16028253734111786
+          },
+          {
+            "feature": "Aggregate_feature_10",
+            "x_value": 3.4184460639953613,
+            "weight": 0.04303363710641861,
+            "contribution": 0.1475200057029724
+          },
+          {
+            "feature": "Aggregate_feature_8",
+            "x_value": 3.438671827316284,
+            "weight": -0.03696509450674057,
+            "contribution": -0.12746667861938477
+          },
+          {
+            "feature": "Aggregate_feature_50",
+            "x_value": 4.012478828430176,
+            "weight": 0.02940213680267334,
+            "contribution": 0.11830572783946991
+          },
+          {
+            "feature": "Aggregate_feature_63",
+            "x_value": 1.8375961780548096,
+            "weight": -0.04885386675596237,
+            "contribution": -0.09002500027418137
+          },
+          {
+            "feature": "Aggregate_feature_54",
+            "x_value": 1.357785940170288,
+            "weight": 0.06088268756866455,
+            "contribution": 0.08289708197116852
+          },
+          {
+            "feature": "Aggregate_feature_65",
+            "x_value": 1.512734293937683,
+            "weight": -0.05173451080918312,
+            "contribution": -0.07847966253757477
+          },
+          {
+            "feature": "Local_feature_20",
+            "x_value": -1.3791478872299194,
+            "weight": 0.05556138604879379,
+            "contribution": -0.07684188336133957
+          }
+        ],
+        "tabular_share_contrib": 0.6791068315505981,
+        "tabular_share_weights": 0.6528128385543823,
+        "graph_share_contrib": 0.32089316844940186
+      }
+    ],
+    "tabular_share_contrib_total": 0.6753943878432196,
+    "tabular_share_weights_total": 0.6549317229658553,
+    "n_tabular_features": 182,
+    "n_gnn_features": 100
+  }
+]
