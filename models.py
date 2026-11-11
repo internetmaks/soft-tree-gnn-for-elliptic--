@@ -221,6 +221,29 @@ class DifferentiableSoftDecisionTree(nn.Module):
             return leaf_q[max_leaf_idx]
         raise ValueError(f"Nieznany tryb predykcji: {mode}")
 
+    # --- Adaptacja po dryfcie: aktualizacja wyłącznie filtrów routingu (w_i, b_i) ---
+    def member_trees(self):
+        """Lista drzew składowych (dla pojedynczego drzewa: [self])."""
+        return [self]
+
+    def routing_parameters(self):
+        """Parametry filtrów routingu węzłów wewnętrznych (w_i, b_i)."""
+        return list(self.inner_nodes.parameters())
+
+    def set_routing_only_trainable(self, routing_only: bool = True) -> None:
+        """Zamraża (`routing_only=True`) rozkłady liści `leaf_logits` oraz temperatury `beta`,
+        pozostawiając trenowalne wyłącznie `inner_nodes`; `False` przywraca pełną trenowalność."""
+        self.leaf_logits.requires_grad_(not routing_only)
+        self.beta.requires_grad_(not routing_only)
+        for p in self.inner_nodes.parameters():
+            p.requires_grad_(True)
+
+    @torch.no_grad()
+    def leaf_illicit_range(self, positive_class: int = 1) -> Tuple[float, float]:
+        """(max, min) prawdopodobieństwa klasy pozytywnej w liściach drzewa."""
+        q = F.softmax(self.leaf_logits, dim=-1)[:, positive_class]
+        return float(q.max().item()), float(q.min().item())
+
 
 class DifferentiableSoftDecisionForest(nn.Module):
     """Komitet (las) K niezależnych różniczkowalnych miękkich drzew decyzyjnych.
@@ -295,6 +318,27 @@ class DifferentiableSoftDecisionForest(nn.Module):
     def predict_probs(self, z: torch.Tensor, mode: str = 'max_path_leaf') -> torch.Tensor:
         probs_list = [tree.predict_probs(z, mode=mode) for tree in self.trees]
         return torch.stack(probs_list, dim=0).mean(dim=0)
+
+    def predict_probs_per_tree(self, z: torch.Tensor, mode: str = 'max_path_leaf') -> torch.Tensor:
+        """Rozkłady klas każdego drzewa: [K, B, C]."""
+        return torch.stack([tree.predict_probs(z, mode=mode) for tree in self.trees], dim=0)
+
+    # --- Adaptacja po dryfcie: aktualizacja wyłącznie filtrów routingu (w_i, b_i) ---
+    def member_trees(self):
+        return list(self.trees)
+
+    def routing_parameters(self):
+        return [p for tree in self.trees for p in tree.routing_parameters()]
+
+    def set_routing_only_trainable(self, routing_only: bool = True) -> None:
+        for tree in self.trees:
+            tree.set_routing_only_trainable(routing_only)
+
+    @torch.no_grad()
+    def leaf_illicit_range(self, positive_class: int = 1) -> Tuple[float, float]:
+        """Średnie po drzewach (max, min) prawdopodobieństwa klasy pozytywnej w liściach."""
+        ranges = [tree.leaf_illicit_range(positive_class) for tree in self.trees]
+        return (sum(r[0] for r in ranges) / len(ranges), sum(r[1] for r in ranges) / len(ranges))
 
 
 class EndToEndGNNSoftTree(nn.Module):
@@ -419,8 +463,10 @@ class EndToEndGNNSoftTree(nn.Module):
         return leaf_path_probs, leaf_q, internal_path_probs, p_right, z
 
     @torch.no_grad()
-    def predict_probs(self, x: torch.Tensor, edge_index: torch.Tensor,
+    def predict_probs(self, x: torch.Tensor, edge_index: Optional[torch.Tensor] = None,
                       mode: str = 'max_path_leaf') -> torch.Tensor:
-        """Rozkłady klas [N, C] dla wszystkich węzłów grafu."""
+        """Rozkłady klas [N, C]. Jeśli `edge_index is None`, `x` traktowane jest jako wejście drzewa Z."""
+        if edge_index is None:
+            return self.tree.predict_probs(x, mode=mode)
         z, _ = self.get_tree_input(x, edge_index)
         return self.tree.predict_probs(z, mode=mode)

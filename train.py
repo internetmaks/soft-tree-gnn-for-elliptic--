@@ -1,7 +1,8 @@
 """Pętla treningowa, early stopping, strojenie progu, destylacja wiedzy oraz ciągłe douczanie po dryfcie."""
 import copy
+import math
 import os
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -12,19 +13,36 @@ from sklearn.metrics import (f1_score, matthews_corrcoef, precision_score,
 from models import DifferentiableSoftDecisionForest, EndToEndGNNSoftTree
 
 DEFAULT_CLASS_WEIGHTS = (0.3, 0.7)   # [licit, illicit]
+ADAPT_CLASS_WEIGHTS = (0.5, 0.5)     # zbalansowany bufor odtwarzania -> wagi równe
 THRESHOLD_RANGE = (0.20, 0.85)
-METRIC_NAMES = ['Precision_Illicit', 'Recall_Illicit', 'F1_Illicit', 'Micro_F1', 'MCC', 'ROC_AUC']
+POST_DRIFT_THRESHOLD_RANGE = (0.30, 0.75)
+TRAIN_LAST_STEP = 29
+DRIFT_STEP = 43
+LAST_STEP = 49
+METRIC_NAMES = ['Precision_Illicit', 'Recall_Illicit', 'F1_Illicit', 'Micro_F1', 'MCC', 'ROC_AUC',
+                'TP', 'FP', 'FN', 'TN']
+
+ThresholdLike = Union[float, torch.Tensor]
 
 
-def compute_metrics(y_true: np.ndarray, p_illicit: np.ndarray, threshold: float = 0.5) -> Dict[str, float]:
-    """Metryki dla niezbalansowanego AML; klasa pozytywna = illicit (1)."""
-    y_pred = (p_illicit >= threshold).astype(np.int64)
+def compute_metrics(y_true: np.ndarray, p_illicit: np.ndarray,
+                    threshold: Union[float, np.ndarray] = 0.5) -> Dict[str, float]:
+    """Metryki dla niezbalansowanego AML; klasa pozytywna = illicit (1).
+
+    `threshold` może być skalarem lub wektorem progów (po jednym na węzeł), np. przy
+    progach zależnych od kroku czasowego w ewaluacji Post-Drift.
+    """
     if len(y_true) == 0:
         return {k: float('nan') for k in METRIC_NAMES}
+    y_pred = (p_illicit >= threshold).astype(np.int64)
     try:
         auc = roc_auc_score(y_true, p_illicit) if len(np.unique(y_true)) == 2 else float('nan')
     except ValueError:
         auc = float('nan')
+    tp = int(np.sum((y_pred == 1) & (y_true == 1)))
+    fp = int(np.sum((y_pred == 1) & (y_true == 0)))
+    fn = int(np.sum((y_pred == 0) & (y_true == 1)))
+    tn = int(np.sum((y_pred == 0) & (y_true == 0)))
     return {
         'Precision_Illicit': precision_score(y_true, y_pred, pos_label=1, zero_division=0),
         'Recall_Illicit': recall_score(y_true, y_pred, pos_label=1, zero_division=0),
@@ -32,6 +50,7 @@ def compute_metrics(y_true: np.ndarray, p_illicit: np.ndarray, threshold: float 
         'Micro_F1': f1_score(y_true, y_pred, average='micro', zero_division=0),
         'MCC': matthews_corrcoef(y_true, y_pred),
         'ROC_AUC': auc,
+        'TP': tp, 'FP': fp, 'FN': fn, 'TN': tn,
     }
 
 
@@ -48,7 +67,7 @@ def find_optimal_threshold(y_true: np.ndarray, p_illicit: np.ndarray,
     fp = np.sum(preds & (~y_pos), axis=0).astype(np.float64)
     fn = np.sum((~preds) & y_pos, axis=0).astype(np.float64)
     denom = 2.0 * tp + fp + fn
-    f1_scores = np.where(denom > 0, (2.0 * tp) / denom, 0.0)
+    f1_scores = np.where(denom > 0, (2.0 * tp) / np.maximum(denom, 1e-12), 0.0)
     best_idx = int(np.argmax(f1_scores))
     return float(thresholds[best_idx]), float(f1_scores[best_idx])
 
@@ -72,22 +91,37 @@ def tune_threshold_on_val(model: EndToEndGNNSoftTree, data, inference_mode: str 
     return find_optimal_threshold(y_val, p_val, low=low, high=high)
 
 
+def _threshold_for_mask(threshold: ThresholdLike, mask: torch.Tensor):
+    """Próg (skalar lub wektor numpy) dla węzłów z maski."""
+    if isinstance(threshold, torch.Tensor):
+        return threshold[mask].detach().cpu().numpy()
+    return float(threshold)
+
+
+def _mean_threshold(threshold: ThresholdLike, mask: torch.Tensor) -> float:
+    if isinstance(threshold, torch.Tensor):
+        sel = threshold[mask]
+        return round(float(sel.mean().item()), 4) if sel.numel() > 0 else float('nan')
+    return round(float(threshold), 4)
+
+
 @torch.no_grad()
 def evaluate_mask(model: EndToEndGNNSoftTree, data, mask: torch.Tensor,
                   inference_mode: str = 'max_path_leaf',
                   probs: Optional[torch.Tensor] = None,
-                  threshold: float = 0.5) -> Dict[str, float]:
-    """Metryki na podanej masce przy zadanym progu decyzyjnym (np. wyznaczonym na walidacji)."""
+                  threshold: ThresholdLike = 0.5) -> Dict[str, float]:
+    """Metryki na podanej masce przy zadanym progu (skalar lub wektor progów per węzeł)."""
     if probs is None:
         probs = predict_all_probs(model, data, inference_mode)
     y_true = data.y[mask].cpu().numpy()
     p = probs[mask].detach().cpu().numpy()
-    return compute_metrics(y_true, p, threshold=threshold)
+    return compute_metrics(y_true, p, threshold=_threshold_for_mask(threshold, mask))
 
 
 def _train_period_mask(data) -> torch.Tensor:
-    """Wszystkie węzły (także `unknown`) z kroków 1-29 – do semi-supervised regularyzacji i destylacji."""
-    return (data.time_step >= 1) & (data.time_step <= 29)
+    """Wszystkie węzły (oznaczone ORAZ `unknown`, y == -1) z kroków 1-29 –
+    do regularyzacji semi-supervised (EMA) i destylacji."""
+    return data.time_step <= TRAIN_LAST_STEP
 
 
 def _train_unknown_mask(data) -> torch.Tensor:
@@ -102,6 +136,7 @@ def generate_soft_targets(teacher_model: EndToEndGNNSoftTree, data,
 
     Podczas destylacji wykorzystywane są wyłącznie węzły z kroków 1-29 (w tym 77% `unknown`),
     co gwarantuje całkowity brak wycieku informacji z walidacji (30-34) i testu (35-49).
+    Nauczyciel musi być modelem SPRZED adaptacji post-drift (adaptacja widzi etykiety 30-48).
     """
     teacher_model.eval()
     return teacher_model.predict_probs(data.x, data.edge_index, mode=inference_mode).detach()
@@ -110,28 +145,41 @@ def generate_soft_targets(teacher_model: EndToEndGNNSoftTree, data,
 def train_model(model: EndToEndGNNSoftTree, data, epochs: int = 500, lr: float = 1e-3,
                 weight_decay: float = 1e-4, patience: int = 50,
                 class_weights=DEFAULT_CLASS_WEIGHTS, inference_mode: str = 'max_path_leaf',
-                semi_supervised_reg: Optional[bool] = None, tune_threshold: bool = True,
+                semi_supervised_reg: Optional[bool] = True, tune_threshold: bool = True,
                 soft_targets: Optional[torch.Tensor] = None, distill_alpha: float = 0.5,
                 verbose: bool = True, log_every: int = 10):
     """Trening full-batch; strata na `train_mask` (oraz opcjonalnie destylacja na krokach 1-29),
     early stopping i strojenie progu (0.20-0.85) po F1_Illicit na `val_mask` (kroki 30-34).
 
-    Domyślnie dla enkodera GAT aktywowana jest synergia z regularyzacją półnadzorowaną EMA
-    na wszystkich węzłach z kroków 1-29.
+    Gdy `semi_supervised_reg=True` (domyślnie), `reg_mask = (time_step <= 29)` – wszystkie węzły
+    okresu treningowego niezależnie od etykiety (także `unknown`) – trafia do `compute_loss`
+    jako źródło alpha_i i aktualizacji bufora EMA.
     Zwraca (model z wczytanym najlepszym stanem, historia treningu ze znalezionym `opt_threshold`).
     """
+    if semi_supervised_reg is None:
+        semi_supervised_reg = True
+    semi_supervised_reg = bool(semi_supervised_reg)
+
     device = next(model.parameters()).device
     cw = torch.tensor(class_weights, dtype=torch.float32, device=device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-
-    if semi_supervised_reg is None:
-        semi_supervised_reg = (model.backbone == 'gat') or (soft_targets is not None)
+    optimizer = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad],
+                                  lr=lr, weight_decay=weight_decay)
 
     train_period_mask = _train_period_mask(data)
     reg_mask = train_period_mask if semi_supervised_reg else None
     distill_mask = train_period_mask if soft_targets is not None else None
     if soft_targets is not None:
         soft_targets = soft_targets.to(device)
+    is_forest = isinstance(model.tree, DifferentiableSoftDecisionForest)
+
+    reg_n = int(reg_mask.sum().item()) if reg_mask is not None else 0
+    reg_unknown_n = int((reg_mask & (data.y == -1)).sum().item()) if reg_mask is not None else 0
+    if verbose:
+        if reg_mask is not None:
+            print(f"[semi-supervised EMA] AKTYWNA: reg_mask = time_step <= {TRAIN_LAST_STEP} "
+                  f"({reg_n} węzłów, w tym {reg_unknown_n} unknown)")
+        else:
+            print("[semi-supervised EMA] WYŁĄCZONA (alpha_i liczone tylko na węzłach oznaczonych)")
 
     history = {'epoch': [], 'loss': [], 'val_F1_Illicit': [], 'val_threshold': []}
     best_f1, best_epoch, best_thr, best_state, bad_epochs = -1.0, 0, 0.5, None, 0
@@ -141,7 +189,7 @@ def train_model(model: EndToEndGNNSoftTree, data, epochs: int = 500, lr: float =
         optimizer.zero_grad()
         m = data.train_mask
 
-        if isinstance(model.tree, DifferentiableSoftDecisionForest):
+        if is_forest:
             forest_outputs, _ = model(data.x, data.edge_index)
             loss = model.tree.compute_loss(
                 forest_outputs, data.y, cw,
@@ -204,6 +252,9 @@ def train_model(model: EndToEndGNNSoftTree, data, epochs: int = 500, lr: float =
     history['best_epoch'] = best_epoch
     history['best_val_F1_Illicit'] = best_f1
     history['opt_threshold'] = best_thr
+    history['semi_supervised_reg'] = semi_supervised_reg
+    history['reg_mask_nodes'] = reg_n
+    history['reg_mask_unknown_nodes'] = reg_unknown_n
     return model, history
 
 
@@ -263,45 +314,53 @@ def train_distilled_tree(student_model: EndToEndGNNSoftTree, data,
         verbose=verbose, log_every=log_every)
 
 
+REGIMES = (
+    ('Całość (35-49)', 'test_mask'),
+    ('Pre-Drift (35-42)', 'test_pre_drift_mask'),
+    ('Szok (krok 43)', 'test_drift_step43_mask'),
+    ('Post-Drift (44-49)', 'test_post_drift_mask'),
+)
+
+
 def evaluate_regimes(model: EndToEndGNNSoftTree, data, inference_mode: str = 'max_path_leaf',
-                     threshold: float = 0.5, probs: Optional[torch.Tensor] = None) -> pd.DataFrame:
-    """Metryki w 4 reżimach czasowych: Całość 35-49, Pre-Drift 35-42, Szok 43, Post-Drift 44-49."""
+                     threshold: ThresholdLike = 0.5, probs: Optional[torch.Tensor] = None) -> pd.DataFrame:
+    """Metryki w 4 reżimach czasowych: Całość 35-49, Pre-Drift 35-42, Szok 43, Post-Drift 44-49.
+
+    `threshold` może być wektorem progów per węzeł (progi zależne od kroku); wówczas kolumna
+    `Opt_Threshold` raportuje średni próg zastosowany w danym reżimie.
+    """
     if probs is None:
         probs = predict_all_probs(model, data, inference_mode)
-    regimes = [
-        ('Całość (35-49)', data.test_mask),
-        ('Pre-Drift (35-42)', data.test_pre_drift_mask),
-        ('Szok (krok 43)', data.test_drift_step43_mask),
-        ('Post-Drift (44-49)', data.test_post_drift_mask),
-    ]
     rows = []
-    for name, mask in regimes:
+    for name, attr in REGIMES:
+        mask = getattr(data, attr)
         res = evaluate_mask(model, data, mask, inference_mode, probs=probs, threshold=threshold)
-        res = {'Reżim': name, 'N': int(mask.sum()), 'N_illicit': int((data.y[mask] == 1).sum()),
-               'Opt_Threshold': float(threshold), **res}
-        rows.append(res)
+        rows.append({'Reżim': name, 'N': int(mask.sum()), 'N_illicit': int((data.y[mask] == 1).sum()),
+                     'Opt_Threshold': _mean_threshold(threshold, mask), **res})
     return pd.DataFrame(rows).set_index('Reżim')
 
 
 def evaluate_per_timestep(model: EndToEndGNNSoftTree, data, inference_mode: str = 'max_path_leaf',
                           save_csv: Optional[str] = None, save_plot: Optional[str] = None,
-                          threshold: float = 0.5, probs: Optional[torch.Tensor] = None) -> pd.DataFrame:
-    """Ewaluacja krok po kroku t = 35..49; opcjonalny zapis tabeli (CSV) i wykresu (PNG)."""
+                          threshold: ThresholdLike = 0.5, probs: Optional[torch.Tensor] = None) -> pd.DataFrame:
+    """Ewaluacja krok po kroku t = 35..49 (z faktycznym progiem użytym w każdym kroku);
+    opcjonalny zapis tabeli (CSV, UTF-8) i wykresu (PNG)."""
     if probs is None:
         probs = predict_all_probs(model, data, inference_mode)
     labeled = data.y != -1
     rows = []
-    for t in range(35, 50):
-        mask = (data.time_step == t) & labeled
+    for t in range(35, LAST_STEP + 1):
+        step_all = data.time_step == t
+        mask = step_all & labeled
         res = evaluate_mask(model, data, mask, inference_mode, probs=probs, threshold=threshold)
         rows.append({'time_step': t, 'N': int(mask.sum()),
                      'N_illicit': int((data.y[mask] == 1).sum()),
-                     'Opt_Threshold': float(threshold), **res})
+                     'Opt_Threshold': _mean_threshold(threshold, step_all), **res})
     df = pd.DataFrame(rows).set_index('time_step')
 
     if save_csv:
         os.makedirs(os.path.dirname(os.path.abspath(save_csv)), exist_ok=True)
-        df.to_csv(save_csv)
+        df.to_csv(save_csv, encoding='utf-8')
     if save_plot:
         import matplotlib
         matplotlib.use('Agg')
@@ -311,10 +370,12 @@ def evaluate_per_timestep(model: EndToEndGNNSoftTree, data, inference_mode: str 
         for col, style in [('F1_Illicit', 'o-'), ('Precision_Illicit', 's--'),
                            ('Recall_Illicit', '^--'), ('MCC', 'd:')]:
             ax.plot(df.index, df[col], style, label=col)
-        ax.axvline(43, color='red', linestyle=':', label='Zamknięcie darknetu (t=43)')
+        ax.step(df.index, df['Opt_Threshold'], where='mid', color='gray', alpha=0.7,
+                linestyle='-.', label='Próg decyzyjny (Opt_Threshold)')
+        ax.axvline(DRIFT_STEP, color='red', linestyle=':', label='Zamknięcie darknetu (t=43)')
         ax.set_xlabel('Krok czasowy')
         ax.set_ylabel('Wartość metryki')
-        ax.set_title(f'Metryki klasy illicit w kolejnych krokach testowych (próg={threshold:.2f})')
+        ax.set_title('Metryki klasy illicit w kolejnych krokach testowych')
         ax.set_ylim(-0.05, 1.05)
         ax.grid(alpha=0.3)
         ax.legend(loc='lower left', fontsize=8)
@@ -324,19 +385,119 @@ def evaluate_per_timestep(model: EndToEndGNNSoftTree, data, inference_mode: str 
     return df
 
 
-def _sample_replay_buffer(data, max_step: int, replay_size: int, rng: np.random.Generator) -> torch.Tensor:
-    """Losuje zbalansowany bufor odtwarzania (Replay Buffer) z oznaczonych węzłów z kroków <= max_step."""
-    hist_mask = (data.time_step <= max_step) & (data.y != -1)
-    illicit_idx = torch.nonzero(hist_mask & (data.y == 1), as_tuple=False).view(-1).cpu().numpy()
-    licit_idx = torch.nonzero(hist_mask & (data.y == 0), as_tuple=False).view(-1).cpu().numpy()
+@torch.no_grad()
+def get_adaptive_post_drift_threshold(model: EndToEndGNNSoftTree, z_all: torch.Tensor,
+                                      val_mask: torch.Tensor, y_all: torch.Tensor,
+                                      base_threshold: float, current_step_mask: torch.Tensor,
+                                      min_pos_rate: float = 0.015,
+                                      inference_mode: str = 'max_path_leaf',
+                                      low: float = POST_DRIFT_THRESHOLD_RANGE[0],
+                                      high: float = POST_DRIFT_THRESHOLD_RANGE[1],
+                                      majority_frac: float = 0.6, majority_margin: float = 0.02,
+                                      quantile_floor: float = 0.35,
+                                      return_info: bool = False):
+    """Próg tau_t dla kroku t >= 43 (wyznaczany PRZED predykcją kroku t, bez jego etykiet).
 
-    n_illicit = min(len(illicit_idx), replay_size // 2)
-    n_licit = min(len(licit_idx), replay_size - n_illicit)
+    1. Ponowne strojenie F1 w [low, high] na zbiorze kalibracyjnym `val_mask` (maska lub indeksy:
+       walidacja 30-34 lub ujawnione kroki post-drift < t), przy bieżących (zaadaptowanych)
+       filtrach drzewa; wynik nie przekracza progu walidacyjnego `base_threshold`.
+    2. Sufit głosowania większościowego (las): tau <= f*mean_max + (1-f)*mean_min - margin,
+       gdzie f = ceil(0.6 K)/K (dla K=5: 3/5 drzew w najsilniejszym liściu illicit wystarcza).
+    3. Dolny limit kwantylowy: jeśli w kroku t (bez informacji o etykietach) mniej niż
+       `min_pos_rate` predykcji przekracza tau, próg obniżany jest do kwantyla (1 - min_pos_rate),
+       nie niżej niż `quantile_floor`.
+    """
+    model.eval()
+    tree = model.tree
+    info = {}
 
-    sel_illicit = rng.choice(illicit_idx, size=n_illicit, replace=False) if n_illicit > 0 else np.empty(0, dtype=np.int64)
-    sel_licit = rng.choice(licit_idx, size=n_licit, replace=False) if n_licit > 0 else np.empty(0, dtype=np.int64)
-    replay_idx = np.concatenate([sel_illicit, sel_licit])
-    return torch.tensor(replay_idx, dtype=torch.long, device=data.x.device)
+    probs_cal = model.predict_probs(z_all[val_mask], mode=inference_mode)[:, 1]
+    y_cal = y_all[val_mask]
+    lab = y_cal != -1
+    p_np = probs_cal[lab].detach().cpu().numpy()
+    y_np = y_cal[lab].detach().cpu().numpy()
+    best_th, best_f1 = find_optimal_threshold(y_np, p_np, low=low, high=high,
+                                              num_steps=int(round((high - low) / 0.01)) + 1)
+    best_th = min(best_th, float(base_threshold))
+    info['retuned_threshold'] = best_th
+    info['calibration_f1'] = best_f1
+
+    if hasattr(tree, 'trees'):
+        k = len(tree.trees)
+        votes = math.ceil(majority_frac * k)
+        frac = votes / k
+        max_illicit_per_tree = []
+        min_illicit_per_tree = []
+        for t_mod in tree.trees:
+            q = torch.softmax(t_mod.leaf_logits, dim=-1)[:, 1]
+            max_illicit_per_tree.append(q.max().item())
+            min_illicit_per_tree.append(q.min().item())
+        mean_max = sum(max_illicit_per_tree) / len(max_illicit_per_tree)
+        mean_min = sum(min_illicit_per_tree) / len(min_illicit_per_tree)
+        majority_th = frac * mean_max + (1.0 - frac) * mean_min - majority_margin
+        info.update({'majority_votes': f"{votes}/{k}", 'mean_max_leaf': mean_max,
+                     'mean_min_leaf': mean_min, 'majority_threshold': majority_th})
+        best_th = min(best_th, majority_th)
+
+    probs_step = model.predict_probs(z_all[current_step_mask], mode=inference_mode)[:, 1]
+    info['quantile_relaxed'] = False
+    if probs_step.numel() > 0:
+        pos_rate = float((probs_step >= best_th).float().mean().item())
+        info['pos_rate_before_floor'] = pos_rate
+        if pos_rate < min_pos_rate:
+            quantile_th = float(torch.quantile(probs_step.detach().cpu().float(), 1.0 - min_pos_rate).item())
+            relaxed = min(best_th, max(quantile_floor, quantile_th))
+            info['quantile_relaxed'] = relaxed < best_th
+            best_th = relaxed
+
+    final_th = round(float(best_th), 4)
+    info['final_threshold'] = final_th
+    if return_info:
+        return final_th, info
+    return final_th
+
+
+def _build_balanced_replay(data, risk_scores: torch.Tensor, t: int, replay_size: int,
+                           rng: np.random.Generator, recent_start: int = 30,
+                           hard_frac: float = 0.5) -> torch.Tensor:
+    """Bufor odtwarzania zbalansowany klasowo (50% illicit / 50% licit) z ujawnionych kroków <= t.
+
+    * połowa illicit: wszystkie węzły illicit z kroku t + losowanie (z powtórzeniami, jeśli
+      potrzeba) z węzłów illicit z kroków [recent_start, t],
+    * połowa licit: `hard_frac` „trudnych” węzłów licit z [recent_start, t] o najwyższym
+      bieżącym ryzyku p_illicit (potencjalne FP) + losowe węzły licit z całej historii 1..t.
+    """
+    y, ts = data.y, data.time_step
+    dev = y.device
+
+    def idx(mask):
+        return torch.nonzero(mask, as_tuple=False).view(-1).cpu().numpy()
+
+    recent = (ts >= recent_start) & (ts <= t)
+    cur_ill = idx((ts == t) & (y == 1))
+    ill_recent = idx(recent & (y == 1))
+    lic_recent = idx(recent & (y == 0))
+    lic_hist = idx((ts <= t) & (y == 0))
+
+    n_half = max(replay_size // 2, 1)
+    ill = cur_ill[:n_half]
+    need = n_half - len(ill)
+    if need > 0 and len(ill_recent) > 0:
+        extra = rng.choice(ill_recent, size=need, replace=len(ill_recent) < need)
+        ill = np.concatenate([ill, extra])
+
+    n_hard = min(int(round(n_half * hard_frac)), len(lic_recent))
+    if n_hard > 0:
+        risk = risk_scores[torch.as_tensor(lic_recent, device=risk_scores.device)]
+        top = torch.topk(risk, n_hard).indices.cpu().numpy()
+        hard = lic_recent[top]
+    else:
+        hard = np.empty(0, dtype=np.int64)
+    n_rand = min(n_half - len(hard), len(lic_hist))
+    rand_lic = rng.choice(lic_hist, size=n_rand, replace=False) if n_rand > 0 else np.empty(0, dtype=np.int64)
+
+    out = np.concatenate([ill, hard, rand_lic]).astype(np.int64)
+    return torch.as_tensor(out, dtype=torch.long, device=dev)
 
 
 def evaluate_continual_post_drift(
@@ -344,83 +505,130 @@ def evaluate_continual_post_drift(
     data,
     inference_mode: str = 'max_path_leaf',
     threshold: float = 0.5,
-    adapt_steps: int = 15,
-    adapt_lr: float = 5e-3,
+    adapt_steps: int = 10,
+    adapt_lr: float = 1e-3,
     replay_size: int = 2000,
-    class_weights=DEFAULT_CLASS_WEIGHTS,
+    ewc_lambda: float = 1e-2,
+    min_pos_rate: float = 0.015,
+    hard_frac: float = 0.5,
+    adapt_class_weights=ADAPT_CLASS_WEIGHTS,
+    class_weights=None,
     seed: int = 42,
     verbose: bool = True,
     save_csv: Optional[str] = None,
     save_plot: Optional[str] = None,
-) -> Tuple[pd.DataFrame, pd.DataFrame, EndToEndGNNSoftTree]:
-    """Ewaluacja z ciągłym douczaniem po szoku w kroku 43 (kroki 43-49) z buforem odtwarzania.
+):
+    """Ewaluacja prekwencyjna z ciągłym douczaniem po szoku w kroku 43 (kroki 43-49).
 
-    Rygor braku wycieku danych z przyszłości:
-    1. Kroki 35-43 są oceniane modelem sprzed adaptacji (przed ujawnieniem etykiet kroku 43).
-    2. W każdym kroku t in {43, ..., 48}, po dokonaniu predykcji na kroku t, wagi enkodera GNN
-       są zamrażane (`requires_grad=False`), a parametry liści i filtrów drzewa są aktualizowane
-       na ujawnionych etykietach z kroku t połączonych z buforem odtwarzania (Replay Buffer)
-       z wcześniejszych kroków czasowych (< t).
-    3. Zaktualizowane drzewo wykonuje predykcję dla kolejnego kroku t + 1.
+    Protokół (bez wycieku danych z przyszłości):
+    * kroki 35-42: model bazowy i statyczny próg walidacyjny `threshold`,
+    * dla t = 43..49: (a) próg tau_t z `get_adaptive_post_drift_threshold` przy bieżącym stanie
+      drzewa (zaadaptowanym na krokach < t), (b) predykcja kroku t, (c) ujawnienie etykiet kroku t
+      i adaptacja przed krokiem t+1.
+    * Adaptacja: zamrożony enkoder GNN (conv*, emb_norm), zamrożone `leaf_logits` i `beta`;
+      aktualizowane są wyłącznie filtry routingu `inner_nodes` (w_i, b_i) na zbalansowanym
+      buforze Replay (50/50), z kotwicą L2 (EWC-lite) `ewc_lambda * sum((p - p_pre)^2)`
+      do wag sprzed dryfu.
 
-    Zwraca (regimes_df, per_timestep_df, adapted_model).
+    Zwraca (regimes_df, per_timestep_df, adapted_model, extras), gdzie extras zawiera
+    `probs` (P(illicit) faktycznie użyte do oceny), `thresholds` (próg per węzeł),
+    `step_thresholds` oraz `log` (diagnostyka każdego kroku).
     """
+    if class_weights is not None and adapt_class_weights is None:
+        adapt_class_weights = class_weights
     device = next(model.parameters()).device
-    cw = torch.tensor(class_weights, dtype=torch.float32, device=device)
+    cw = torch.tensor(adapt_class_weights, dtype=torch.float32, device=device)
     rng = np.random.default_rng(seed)
 
-    adapted_model = copy.deepcopy(model)
-    adapted_model.freeze_gnn_encoder(True)
+    adapted = copy.deepcopy(model)
+    adapted.freeze_gnn_encoder(True)
+    tree = adapted.tree
+    tree.set_routing_only_trainable(True)
+    routing_params = tree.routing_parameters()
+    anchor = [p.detach().clone() for p in routing_params]
+    optimizer = torch.optim.AdamW(routing_params, lr=adapt_lr, weight_decay=0.0)
+    is_forest = isinstance(tree, DifferentiableSoftDecisionForest)
 
-    # 1. Predykcja bazowa dla kroków <= 43 oraz zamrożone wejście drzewa Z (GNN zamrożony)
-    adapted_model.eval()
+    adapted.eval()
     with torch.no_grad():
-        probs = predict_all_probs(adapted_model, data, inference_mode).clone()
-        z_frozen, _ = adapted_model.get_tree_input(data.x, data.edge_index)
+        z_frozen, _ = adapted.get_tree_input(data.x, data.edge_index)
         z_frozen = z_frozen.detach()
+        probs = tree.predict_probs(z_frozen, mode=inference_mode)[:, 1].clone()
+    thresholds = torch.full_like(probs, float(threshold))
 
-    tree_params = [p for p in adapted_model.tree.parameters() if p.requires_grad]
-    optimizer = torch.optim.AdamW(tree_params, lr=adapt_lr, weight_decay=1e-4)
-    labeled = data.y != -1
+    val_idx = torch.nonzero(data.val_mask, as_tuple=False).view(-1)
+    last_replay = None
+    step_thresholds = {t: float(threshold) for t in range(35, DRIFT_STEP)}
+    log = []
 
-    # 2. Pętla adaptacji po każdym kroku t = 43..48 i predykcja na kroku t + 1
-    for t in range(43, 49):
-        cur_mask = (data.time_step == t) & labeled
-        cur_idx = torch.nonzero(cur_mask, as_tuple=False).view(-1)
-        if cur_idx.numel() > 0:
-            replay_idx = _sample_replay_buffer(data, max_step=t - 1, replay_size=replay_size, rng=rng)
-            # Przeważenie nowego reżimu względem bufora odtwarzania
-            repeat_factor = max(1, replay_idx.numel() // max(cur_idx.numel(), 1))
-            batch_idx = torch.cat([cur_idx.repeat(repeat_factor), replay_idx], dim=0)
-            z_batch = z_frozen[batch_idx]
-            y_batch = data.y[batch_idx]
+    for t in range(DRIFT_STEP, LAST_STEP + 1):
+        step_all = data.time_step == t
+        if not bool(step_all.any()):
+            continue
+        step_eval = step_all & (data.y != -1)
+        step_probe = step_eval if bool(step_eval.any()) else step_all
 
-            adapted_model.tree.train()
+        # (a) próg dla kroku t – wyłącznie z wiedzy dostępnej przed ujawnieniem etykiet kroku t
+        post_revealed = torch.nonzero(
+            (data.time_step >= DRIFT_STEP) & (data.time_step < t) & (data.y != -1),
+            as_tuple=False).view(-1)
+        calib_idx = post_revealed if post_revealed.numel() > 0 else val_idx
+        tau_t, info = get_adaptive_post_drift_threshold(
+            adapted, z_frozen, calib_idx, data.y, float(threshold), step_probe,
+            min_pos_rate=min_pos_rate, inference_mode=inference_mode, return_info=True)
+
+        # (b) predykcja kroku t bieżącym stanem drzewa
+        tree.eval()
+        with torch.no_grad():
+            probs[step_all] = tree.predict_probs(z_frozen[step_all], mode=inference_mode)[:, 1]
+        thresholds[step_all] = tau_t
+        step_thresholds[t] = tau_t
+
+        entry = {'time_step': t, 'threshold': tau_t, **info}
+        if t >= LAST_STEP:
+            log.append(entry)
+            break
+
+        # (c) ujawnienie etykiet kroku t -> adaptacja filtrów routingu przed krokiem t+1
+        with torch.no_grad():
+            risk = tree.predict_probs(z_frozen, mode='soft_average')[:, 1]
+        replay_idx = _build_balanced_replay(data, risk, t, replay_size, rng, hard_frac=hard_frac)
+        if replay_idx.numel() > 0:
+            z_b, y_b = z_frozen[replay_idx], data.y[replay_idx]
+            tree.train()
+            loss_val = ewc_val = 0.0
             for _ in range(adapt_steps):
                 optimizer.zero_grad()
-                if isinstance(adapted_model.tree, DifferentiableSoftDecisionForest):
-                    forest_out = adapted_model.tree(z_batch)
-                    loss = adapted_model.tree.compute_loss(forest_out, y_batch, cw)
+                if is_forest:
+                    loss = tree.compute_loss(tree(z_b), y_b, cw)
                 else:
-                    l_pp, l_q, i_pp, p_r = adapted_model.tree(z_batch)
-                    loss = adapted_model.tree.compute_loss(l_pp, l_q, i_pp, p_r, y_batch, cw)
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(tree_params, max_norm=2.0)
+                    l_pp, l_q, i_pp, p_r = tree(z_b)
+                    loss = tree.compute_loss(l_pp, l_q, i_pp, p_r, y_b, cw)
+                ewc = sum(((p - a) ** 2).sum() for p, a in zip(routing_params, anchor))
+                total = loss + ewc_lambda * ewc
+                total.backward()
+                torch.nn.utils.clip_grad_norm_(routing_params, max_norm=2.0)
                 optimizer.step()
+                loss_val, ewc_val = float(loss.item()), float(ewc.item())
+            tree.eval()
+            last_replay = replay_idx
+            n_ill = int((y_b == 1).sum().item())
+            entry.update({'replay_size': int(replay_idx.numel()), 'replay_illicit': n_ill,
+                          'adapt_loss': loss_val, 'ewc_drift': ewc_val})
+        log.append(entry)
+        if verbose:
+            print(f"[Continual t={t}] tau_t={tau_t:.4f} | replay={entry.get('replay_size', 0)} "
+                  f"(illicit {entry.get('replay_illicit', 0)}) | loss={entry.get('adapt_loss', float('nan')):.4f} "
+                  f"| ||θ-θ_pre||²={entry.get('ewc_drift', float('nan')):.4e}")
 
-        # Predykcja na kroku t + 1 bez zaglądania do jego etykiet
-        next_mask = data.time_step == (t + 1)
-        adapted_model.eval()
-        with torch.no_grad():
-            probs[next_mask] = adapted_model.tree.predict_probs(
-                z_frozen[next_mask], mode=inference_mode)[:, 1]
-
-    regimes_df = evaluate_regimes(adapted_model, data, inference_mode, threshold=threshold, probs=probs)
+    regimes_df = evaluate_regimes(adapted, data, inference_mode, threshold=thresholds, probs=probs)
     per_step_df = evaluate_per_timestep(
-        adapted_model, data, inference_mode,
-        save_csv=save_csv, save_plot=save_plot,
-        threshold=threshold, probs=probs)
+        adapted, data, inference_mode, save_csv=save_csv, save_plot=save_plot,
+        threshold=thresholds, probs=probs)
     if verbose:
-        post_f1 = float(regimes_df.loc['Post-Drift (44-49)', 'F1_Illicit'])
-        print(f"[Continual Post-Drift 43->49] Post-Drift F1_Illicit={post_f1:.4f} (próg={threshold:.2f})")
-    return regimes_df, per_step_df, adapted_model
+        for name in ('Szok (krok 43)', 'Post-Drift (44-49)'):
+            r = regimes_df.loc[name]
+            print(f"[Continual] {name}: F1={r['F1_Illicit']:.4f} P={r['Precision_Illicit']:.4f} "
+                  f"R={r['Recall_Illicit']:.4f} TP={int(r['TP'])} (śr. próg={r['Opt_Threshold']:.3f})")
+    extras = {'probs': probs, 'thresholds': thresholds, 'step_thresholds': step_thresholds, 'log': log}
+    return regimes_df, per_step_df, adapted, extras
