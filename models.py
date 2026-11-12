@@ -25,9 +25,10 @@ class HeadChunkedGATConv(GATConv):
     * buforuje `edge_index` z dodanymi pętlami własnymi.
     """
 
-    def __init__(self, *args, head_chunk: int = 4, **kwargs):
+    def __init__(self, *args, head_chunk: int = 4, bidirectional: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
-        self.head_chunk = max(1, head_chunk)
+        self.head_chunk = max(1, head_chunk) if head_chunk and head_chunk > 0 else self.heads
+        self.bidirectional = bool(bidirectional) and (self.heads >= 2)
         self._cached_loop_key = None
         self._cached_loop_ei = None
 
@@ -77,20 +78,28 @@ class HeadChunkedGATConv(GATConv):
         src, dst = edge_index[0], edge_index[1]
         w = self.lin.weight.view(H, C, -1)
 
+        half_h = H // 2
+        step = min(self.head_chunk, half_h) if self.bidirectional else self.head_chunk
+
         outs = []
         acc = None
         ckpt = use_ckpt and self.training and torch.is_grad_enabled()
-        for s in range(0, H, self.head_chunk):
-            e = min(s + self.head_chunk, H)
+        s = 0
+        while s < H:
+            e = min(s + step, half_h) if (self.bidirectional and s < half_h) else min(s + step, H)
+            # Pierwsza połowa głowic: przepływ w przód (src -> dst, fan-in);
+            # druga połowa głowic: przepływ wsteczny (dst -> src, fan-out / peeling chains)
+            c_src, c_dst = (dst, src) if (self.bidirectional and s >= half_h) else (src, dst)
             wc = w[s:e].reshape((e - s) * C, -1)
             args = (x, wc, self.att_src[:, s:e, :], self.att_dst[:, s:e, :],
-                    src, dst, N, self.negative_slope, self.dropout, self.training)
+                    c_src, c_dst, N, self.negative_slope, self.dropout, self.training)
             o = (checkpoint(self._attend_chunk, *args, use_reentrant=False)
                  if ckpt else self._attend_chunk(*args))
             if self.concat:
                 outs.append(o.reshape(N, (e - s) * C))
             else:
                 acc = o.sum(dim=1) if acc is None else acc + o.sum(dim=1)
+            s = e
 
         out = torch.cat(outs, dim=1) if self.concat else (acc / H)
         if self.bias is not None:
@@ -131,10 +140,20 @@ class DifferentiableSoftDecisionTree(nn.Module):
         self.register_buffer('depth_weights', torch.tensor(depth_weights, dtype=torch.float32))
         self.register_buffer('ema_decays', torch.tensor(ema_decays, dtype=torch.float32))
         self.register_buffer('ema_alpha', torch.full((self.num_internal,), 0.5, dtype=torch.float32))
+        self.register_buffer('col_mask', torch.ones(in_features, dtype=torch.float32))
+
+    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
+                              missing_keys, unexpected_keys, error_msgs):
+        col_key = prefix + 'col_mask'
+        if col_key not in state_dict:
+            state_dict[col_key] = self.col_mask.clone()
+        super()._load_from_state_dict(state_dict, prefix, local_metadata, strict,
+                                      missing_keys, unexpected_keys, error_msgs)
 
     def forward(self, z: torch.Tensor):
         """Zwraca (leaf_path_probs [B,2^d], leaf_q [2^d,C], internal_path_probs [B,2^d-1], p_right [B,2^d-1])."""
         batch_size = z.size(0)
+        z = z * self.col_mask
         logits = self.inner_nodes(z) * self.beta
         p_right = torch.sigmoid(logits)
         p_left = 1.0 - p_right
@@ -188,9 +207,10 @@ class DifferentiableSoftDecisionTree(nn.Module):
         cls_loss = torch.sum(leaf_path_probs * leaf_ce, dim=1).mean()
 
         if soft_targets is not None:
+            # Destylacja wiedzy (Frosst & Hinton): miękkie cele nauczyciela zawierają już
+            # wzmocnienie klasy mniejszościowej z treningu nauczyciela -> brak podwójnego ważenia cw
             s_lpp = soft_leaf_path_probs if soft_leaf_path_probs is not None else leaf_path_probs
-            weighted_soft = soft_targets.float() * class_weights.unsqueeze(0)
-            soft_leaf_ce = -torch.matmul(weighted_soft, log_q.t())
+            soft_leaf_ce = -torch.matmul(soft_targets.float(), log_q.t())
             soft_cls_loss = torch.sum(s_lpp * soft_leaf_ce, dim=1).mean()
             cls_loss = (1.0 - distill_alpha) * cls_loss + distill_alpha * soft_cls_loss
 
@@ -248,9 +268,10 @@ class DifferentiableSoftDecisionTree(nn.Module):
 class DifferentiableSoftDecisionForest(nn.Module):
     """Komitet (las) K niezależnych różniczkowalnych miękkich drzew decyzyjnych.
 
-    Każde drzewo otrzymuje losowo zamaskowaną podprzestrzeń cech wejściowych
-    (`nn.Dropout1d`), co wymusza różnorodność filtrów w węzłach wewnętrznych i
-    redukuje wariancję w dolnych partiach drzewa.
+    Każde drzewo otrzymuje stałą binarną maskę podprzestrzeni cech `col_mask`
+    (aktywną zarówno podczas treningu, jak i ewaluacji, analogicznie do `max_features`
+    w Random Forest) oraz lekką regularyzację `nn.Dropout1d` w trakcie treningu,
+    co gwarantuje trwałą specjalizację drzew i dekorelację predykcji w `eval()`.
     """
 
     def __init__(self, in_features: int, num_classes: int = 2, depth: int = 4,
@@ -262,8 +283,9 @@ class DifferentiableSoftDecisionForest(nn.Module):
         self.num_trees = num_trees
         self.penalty_lambda = penalty_lambda
         self.feature_dropout = feature_dropout
+        train_drop_p = min(0.1, feature_dropout * 0.5) if feature_dropout > 0 else 0.0
         self.feature_dropouts = nn.ModuleList([
-            nn.Dropout1d(p=feature_dropout) if feature_dropout > 0 else nn.Identity()
+            nn.Dropout1d(p=train_drop_p) if train_drop_p > 0 else nn.Identity()
             for _ in range(num_trees)
         ])
         self.trees = nn.ModuleList([
@@ -274,6 +296,15 @@ class DifferentiableSoftDecisionForest(nn.Module):
                 penalty_lambda=penalty_lambda
             ) for _ in range(num_trees)
         ])
+        if 0.0 < feature_dropout < 1.0:
+            keep_k = max(1, int(round((1.0 - feature_dropout) * in_features)))
+            for t_idx, tree in enumerate(self.trees):
+                gen = torch.Generator()
+                gen.manual_seed(1337 + 97 * t_idx)
+                perm = torch.randperm(in_features, generator=gen)[:keep_k]
+                mask = torch.zeros(in_features, dtype=torch.float32)
+                mask[perm] = 1.0
+                tree.col_mask.copy_(mask)
 
     def forward(self, z: torch.Tensor):
         outputs = []
@@ -377,10 +408,9 @@ class EndToEndGNNSoftTree(nn.Module):
         self.gnn_in_channels = gnn_in
 
         def gat(*a, **k):
-            # gat_head_chunk > 0: liczenie głowic uwagi paczkami (mniejsze zużycie VRAM)
-            if gat_head_chunk > 0:
-                return HeadChunkedGATConv(*a, head_chunk=gat_head_chunk, **k)
-            return GATConv(*a, **k)
+            # Dwukierunkowy GAT (połowa głowic w przód src->dst, połowa wstecz dst->src)
+            chunk = gat_head_chunk if (gat_head_chunk and gat_head_chunk > 0) else 4
+            return HeadChunkedGATConv(*a, head_chunk=chunk, bidirectional=True, **k)
 
         if backbone == 'gcn':
             self.conv1 = GCNConv(gnn_in, hid)

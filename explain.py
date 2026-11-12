@@ -99,7 +99,8 @@ def _tree_path_attribution(tree, z: torch.Tensor, inference_mode: str):
         p_ill = float(torch.matmul(leaf_pp, leaf_q)[0, 1].item())
     else:
         p_ill = float(leaf_q[leaf_idx, 1].item())
-    z_vec = z[0]
+    mask = getattr(tree, 'col_mask', None)
+    z_vec = z[0] * mask if mask is not None else z[0]
     abs_sum = torch.zeros_like(z_vec)
     support_sum = torch.zeros_like(z_vec)
     path = _path_to_leaf(leaf_idx, tree.depth)
@@ -167,13 +168,17 @@ def explain_node(model: EndToEndGNNSoftTree, data, node_idx: int, top_k: int = 1
 
     # Szczegółowa ścieżka najpewniejszego drzewa
     p_right = best['p_right']
+    best_mask = getattr(tree, 'col_mask', None)
+    z_best = z_vec * best_mask if best_mask is not None else z_vec
     steps = []
     tot_abs_tab, tot_abs_all, tot_w_tab, tot_w_all = 0.0, 0.0, 0.0, 0.0
     for step in best['path']:
         i = step['node_idx']
         w_i = tree.inner_nodes.weight[i]                       # [w_tab || w_graph]
+        if best_mask is not None:
+            w_i = w_i * best_mask
         beta_i = tree.beta[i]
-        contrib = (z_vec * w_i) * beta_i                       # wkład do logitu węzła (z beta)
+        contrib = (z_best * w_i) * beta_i                      # wkład do logitu węzła (z beta)
         abs_c = contrib.abs()
         abs_w = w_i.abs()
 

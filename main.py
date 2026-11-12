@@ -206,6 +206,7 @@ def _run_xai(args, data, out_dir, base_model, base_probs, base_threshold,
 
 def run_experiment(args: argparse.Namespace, data=None, tag: str = None,
                    verbose: bool = True, soft_targets: torch.Tensor = None,
+                   teacher_state_dict: dict = None,
                    pretrained: tuple = None) -> dict:
     """Trenuje (lub wczytuje `pretrained=(state_dict, history)`) i ewaluuje jeden model;
     zapisuje tabele (CSV), wykresy, wyjaśnienia i checkpoint z rozstrzygniętymi argumentami."""
@@ -257,6 +258,7 @@ def run_experiment(args: argparse.Namespace, data=None, tag: str = None,
     elif args.distill:
         model, history = train_distilled_tree(
             model, data, soft_targets=soft_targets,
+            teacher_state_dict=teacher_state_dict,
             teacher_num_trees=args.teacher_trees, distill_alpha=args.distill_alpha,
             epochs=args.epochs, lr=args.lr, weight_decay=args.weight_decay,
             patience=args.patience, class_weights=DEFAULT_CLASS_WEIGHTS,
@@ -421,14 +423,16 @@ def _is_oom(e: Exception) -> bool:
 
 
 def run_with_fallback(args: argparse.Namespace, make_data=lambda: None, tag: str = None,
-                      soft_targets: torch.Tensor = None, pretrained: tuple = None) -> dict:
+                      soft_targets: torch.Tensor = None, teacher_state_dict: dict = None,
+                      pretrained: tuple = None) -> dict:
     """Uruchamia eksperyment; przy braku pamięci GPU najpierw ponawia na GPU z checkpointingiem
     i gat_head_chunk=1, a w ostateczności powtarza na CPU.
 
     Pełny graf Elliptic (204 tys. węzłów) z 8-głowicowym GAT potrafi przekroczyć 16 GB VRAM
     (np. Radeon RX 6950 XT) w trybie full-batch bez checkpointingu.
     """
-    kw = dict(tag=tag, soft_targets=soft_targets, pretrained=pretrained)
+    kw = dict(tag=tag, soft_targets=soft_targets, teacher_state_dict=teacher_state_dict,
+              pretrained=pretrained)
     try:
         return run_experiment(args, data=make_data(), **kw)
     except RuntimeError as e:
@@ -474,7 +478,7 @@ def main(argv=None):
 
     # Ablacje: dane ładowane osobno dla wariantu z/bez LF, reszta współdzielona
     cache, rows, trained = {}, [], {}
-    cached_teacher_soft = None
+    cached_teacher_soft, cached_teacher_state = None, None
     os.makedirs(args.output_dir, exist_ok=True)
     summary_path = os.path.join(args.output_dir, 'ablation_summary.csv')
     for name, cfg in ablation_grid(args):
@@ -489,10 +493,13 @@ def main(argv=None):
         reuse = getattr(cfg, '_reuse_trained_from', None)
         pretrained = trained.get(reuse) if reuse else None
         soft_t = cached_teacher_soft if cfg.distill else None
+        teacher_sd = cached_teacher_state if cfg.distill else None
         summary = run_with_fallback(cfg, make_data=cache[key].clone, tag=f"ablation_{name}",
-                                    soft_targets=soft_t, pretrained=pretrained)
+                                    soft_targets=soft_t, teacher_state_dict=teacher_sd,
+                                    pretrained=pretrained)
         if summary.get('_teacher_soft_targets') is not None and not cfg.distill:
             cached_teacher_soft = summary['_teacher_soft_targets']
+            cached_teacher_state = summary['_trained'][0]
         trained[name] = summary.pop('_trained')
         summary.pop('_teacher_soft_targets', None)
         summary['experiment'] = name

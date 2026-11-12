@@ -15,7 +15,7 @@ from models import DifferentiableSoftDecisionForest, EndToEndGNNSoftTree
 DEFAULT_CLASS_WEIGHTS = (0.3, 0.7)   # [licit, illicit]
 ADAPT_CLASS_WEIGHTS = (0.5, 0.5)     # zbalansowany bufor odtwarzania -> wagi równe
 THRESHOLD_RANGE = (0.20, 0.85)
-POST_DRIFT_THRESHOLD_RANGE = (0.30, 0.75)
+POST_DRIFT_THRESHOLD_RANGE = (0.50, 0.75)
 TRAIN_LAST_STEP = 29
 DRIFT_STEP = 43
 LAST_STEP = 49
@@ -142,6 +142,30 @@ def generate_soft_targets(teacher_model: EndToEndGNNSoftTree, data,
     return teacher_model.predict_probs(data.x, data.edge_index, mode=inference_mode).detach()
 
 
+def _build_optimizer(model: torch.nn.Module, lr: float = 1e-3,
+                     weight_decay: float = 1e-4) -> torch.optim.Optimizer:
+    """Dzieli parametry na grupy z i bez L2 weight_decay (zgodnie z Frosst & Hinton 2017).
+
+    Odwrotna temperatura `beta`, logity rozkładów liści `leaf_logits`, parametry `emb_norm`
+    oraz wektory obciążeń `bias` mają `weight_decay=0.0`, aby nie spłaszczać rozkładów
+    w liściach ku [0.5, 0.5] ani nie rozmywać ostrych podziałów sigmoidalnych.
+    """
+    decay_params, no_decay_params = [], []
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue
+        if any(nd in name for nd in ("beta", "leaf_logits", "emb_norm", "bias")):
+            no_decay_params.append(param)
+        else:
+            decay_params.append(param)
+    groups = []
+    if decay_params:
+        groups.append({"params": decay_params, "weight_decay": weight_decay})
+    if no_decay_params:
+        groups.append({"params": no_decay_params, "weight_decay": 0.0})
+    return torch.optim.AdamW(groups, lr=lr)
+
+
 def train_model(model: EndToEndGNNSoftTree, data, epochs: int = 500, lr: float = 1e-3,
                 weight_decay: float = 1e-4, patience: int = 50,
                 class_weights=DEFAULT_CLASS_WEIGHTS, inference_mode: str = 'max_path_leaf',
@@ -162,8 +186,15 @@ def train_model(model: EndToEndGNNSoftTree, data, epochs: int = 500, lr: float =
 
     device = next(model.parameters()).device
     cw = torch.tensor(class_weights, dtype=torch.float32, device=device)
-    optimizer = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad],
-                                  lr=lr, weight_decay=weight_decay)
+    optimizer = _build_optimizer(model, lr=lr, weight_decay=weight_decay)
+
+    gnn_trainable = any(p.requires_grad for n, p in model.named_parameters() if not n.startswith('tree.'))
+    z_frozen = None
+    if not gnn_trainable:
+        model.eval()
+        with torch.no_grad():
+            z_frozen, _ = model.get_tree_input(data.x, data.edge_index)
+            z_frozen = z_frozen.detach()
 
     train_period_mask = _train_period_mask(data)
     reg_mask = train_period_mask if semi_supervised_reg else None
@@ -190,7 +221,7 @@ def train_model(model: EndToEndGNNSoftTree, data, epochs: int = 500, lr: float =
         m = data.train_mask
 
         if is_forest:
-            forest_outputs, _ = model(data.x, data.edge_index)
+            forest_outputs = model.tree(z_frozen) if z_frozen is not None else model(data.x, data.edge_index)[0]
             loss = model.tree.compute_loss(
                 forest_outputs, data.y, cw,
                 train_labeled_mask=m, reg_mask=reg_mask,
@@ -202,7 +233,10 @@ def train_model(model: EndToEndGNNSoftTree, data, epochs: int = 500, lr: float =
             loss_val = float(loss.item())
             del forest_outputs, loss
         else:
-            leaf_pp, leaf_q, int_pp, p_right, _ = model(data.x, data.edge_index)
+            if z_frozen is not None:
+                leaf_pp, leaf_q, int_pp, p_right = model.tree(z_frozen)
+            else:
+                leaf_pp, leaf_q, int_pp, p_right, _ = model(data.x, data.edge_index)
             loss = model.tree.compute_loss(
                 leaf_pp[m], leaf_q, int_pp[m], p_right[m], data.y[m], cw,
                 reg_internal_path_probs=int_pp[reg_mask] if reg_mask is not None else None,
@@ -216,7 +250,12 @@ def train_model(model: EndToEndGNNSoftTree, data, epochs: int = 500, lr: float =
             loss_val = float(loss.item())
             del leaf_pp, leaf_q, int_pp, p_right, loss
 
-        probs = predict_all_probs(model, data, inference_mode)
+        if z_frozen is not None:
+            model.eval()
+            with torch.no_grad():
+                probs = model.tree.predict_probs(z_frozen, mode=inference_mode)[:, 1]
+        else:
+            probs = predict_all_probs(model, data, inference_mode)
         if tune_threshold:
             epoch_thr, val_f1 = tune_threshold_on_val(model, data, inference_mode, probs=probs)
         else:
@@ -261,6 +300,7 @@ def train_model(model: EndToEndGNNSoftTree, data, epochs: int = 500, lr: float =
 def train_distilled_tree(student_model: EndToEndGNNSoftTree, data,
                          teacher_model: Optional[EndToEndGNNSoftTree] = None,
                          soft_targets: Optional[torch.Tensor] = None,
+                         teacher_state_dict: Optional[dict] = None,
                          teacher_num_trees: int = 5, distill_alpha: float = 0.5,
                          epochs: int = 500, lr: float = 1e-3, weight_decay: float = 1e-4,
                          patience: int = 50, class_weights=DEFAULT_CLASS_WEIGHTS,
@@ -268,13 +308,17 @@ def train_distilled_tree(student_model: EndToEndGNNSoftTree, data,
                          verbose: bool = True, log_every: int = 10):
     """Trenuje pojedyncze miękkie drzewo decyzyjne z destylacją wiedzy na 77% węzłów `unknown` (kroki 1-29).
 
-    Jeśli nie przekazano gotowych `soft_targets` ani `teacher_model`, funkcja najpierw trenuje
-    model nauczyciela (las miękkich drzew z tym samym enkoderem GNN) na krokach 1-29, generuje
-    rozkłady prawdopodobieństwa dla wszystkich węzłów z kroków 1-29 (w tym 77% nieoznaczonych
-    węzłów `unknown`) i destyluje wiedzę do pojedynczego drzewa `student_model`.
+    Zgodnie z Frosst & Hinton (2017):
+    1. Jeśli nie przekazano `soft_targets` ani `teacher_model`, najpierw trenowany jest nauczyciel
+       (Soft Forest K drzew) na krokach 1-29.
+    2. Wytrenowany enkoder GNN nauczyciela (`conv*`, `emb_norm`) jest kopiowany do modelu ucznia
+       i zamrażany (`freeze_gnn_encoder(True)`), dzięki czemu pojedyncze drzewo ucznia uczy się
+       na tej samej wyuczonej reprezentacji grafowej bez ponownego przeuczania GNN.
+    3. Miękkie cele `soft_targets` na węzłach z kroków 1-29 (w tym 77% `unknown`) są destylowane
+       bez podwójnego mnożenia przez `class_weights`.
     """
     device = next(student_model.parameters()).device
-    if soft_targets is None:
+    if soft_targets is None or (teacher_state_dict is None and teacher_model is None):
         if teacher_model is None:
             if verbose:
                 print(f"[Destylacja] Trening modelu nauczyciela (Soft Forest, K={teacher_num_trees} drzew)...")
@@ -299,19 +343,39 @@ def train_distilled_tree(student_model: EndToEndGNNSoftTree, data,
                 patience=patience, class_weights=class_weights, inference_mode=inference_mode,
                 semi_supervised_reg=True, tune_threshold=tune_threshold,
                 verbose=verbose, log_every=log_every)
-        soft_targets = generate_soft_targets(teacher_model, data, inference_mode='soft_average')
-        if verbose:
-            unk_n = int(_train_unknown_mask(data).sum().item())
-            tot_n = int(_train_period_mask(data).sum().item())
-            print(f"[Destylacja] Wygenerowano miękkie cele dla {tot_n} węzłów z kroków 1-29 "
-                  f"(w tym {unk_n} węzłów unknown, {unk_n / max(tot_n, 1):.1%}).")
+        if teacher_state_dict is None and teacher_model is not None:
+            teacher_state_dict = teacher_model.state_dict()
+        if soft_targets is None:
+            soft_targets = generate_soft_targets(teacher_model, data, inference_mode='soft_average')
+            if verbose:
+                unk_n = int(_train_unknown_mask(data).sum().item())
+                tot_n = int(_train_period_mask(data).sum().item())
+                print(f"[Destylacja] Wygenerowano miękkie cele dla {tot_n} węzłów z kroków 1-29 "
+                      f"(w tym {unk_n} węzłów unknown, {unk_n / max(tot_n, 1):.1%}).")
 
-    return train_model(
-        student_model, data, epochs=epochs, lr=lr, weight_decay=weight_decay,
-        patience=patience, class_weights=class_weights, inference_mode=inference_mode,
-        semi_supervised_reg=True, tune_threshold=tune_threshold,
-        soft_targets=soft_targets, distill_alpha=distill_alpha,
-        verbose=verbose, log_every=log_every)
+    # Kopiowanie i zamrożenie wytrenowanego enkodera GNN nauczyciela (conv*, emb_norm)
+    if teacher_state_dict is not None:
+        student_sd = student_model.state_dict()
+        copied = 0
+        for k, v in teacher_state_dict.items():
+            if not k.startswith('tree.') and k in student_sd and student_sd[k].shape == v.shape:
+                student_sd[k].copy_(v.to(student_sd[k].device))
+                copied += 1
+        if copied > 0:
+            student_model.freeze_gnn_encoder(True)
+            if verbose:
+                print(f"[Destylacja] Przeniesiono i zamrożono enkoder GNN nauczyciela ({copied} tensorów).")
+
+    try:
+        student_model, history = train_model(
+            student_model, data, epochs=epochs, lr=lr, weight_decay=weight_decay,
+            patience=patience, class_weights=class_weights, inference_mode=inference_mode,
+            semi_supervised_reg=True, tune_threshold=tune_threshold,
+            soft_targets=soft_targets, distill_alpha=distill_alpha,
+            verbose=verbose, log_every=log_every)
+    finally:
+        student_model.freeze_gnn_encoder(False)
+    return student_model, history
 
 
 REGIMES = (
@@ -393,34 +457,21 @@ def get_adaptive_post_drift_threshold(model: EndToEndGNNSoftTree, z_all: torch.T
                                       inference_mode: str = 'max_path_leaf',
                                       low: float = POST_DRIFT_THRESHOLD_RANGE[0],
                                       high: float = POST_DRIFT_THRESHOLD_RANGE[1],
-                                      majority_frac: float = 0.6, majority_margin: float = 0.02,
-                                      quantile_floor: float = 0.35,
+                                      majority_frac: float = 0.6, majority_margin: float = 0.0,
+                                      quantile_floor: float = 0.52,
                                       return_info: bool = False):
     """Próg tau_t dla kroku t >= 43 (wyznaczany PRZED predykcją kroku t, bez jego etykiet).
 
-    1. Ponowne strojenie F1 w [low, high] na zbiorze kalibracyjnym `val_mask` (maska lub indeksy:
-       walidacja 30-34 lub ujawnione kroki post-drift < t), przy bieżących (zaadaptowanych)
-       filtrach drzewa; wynik nie przekracza progu walidacyjnego `base_threshold`.
-    2. Sufit głosowania większościowego (las): tau <= f*mean_max + (1-f)*mean_min - margin,
-       gdzie f = ceil(0.6 K)/K (dla K=5: 3/5 drzew w najsilniejszym liściu illicit wystarcza).
-    3. Dolny limit kwantylowy: jeśli w kroku t (bez informacji o etykietach) mniej niż
-       `min_pos_rate` predykcji przekracza tau, próg obniżany jest do kwantyla (1 - min_pos_rate),
-       nie niżej niż `quantile_floor`.
+    1. Dolny próg głosowania większościowego (las): tau_maj = f*mean_max + (1-f)*mean_min - margin,
+       gdzie f = ceil(0.6 K)/K (dla K=5: co najmniej 3/5 drzew musi skierować próbkę do liścia illicit).
+       Zapobiega to spadkowi progu do ~0.35 i zalewowi fałszywych alarmów po zamknięciu darknetu.
+    2. Ponowne strojenie F1 w [max(low, tau_maj), high] na zbiorze kalibracyjnym `val_mask`
+       (walidacja 30-34 oraz ujawnione kroki post-drift < t), ograniczone z góry przez `base_threshold`
+       oraz przez `tau_maj`, gdy na małej próbce post-drift próg walidacyjny jest zbyt restrykcyjny.
     """
     model.eval()
     tree = model.tree
     info = {}
-
-    probs_cal = model.predict_probs(z_all[val_mask], mode=inference_mode)[:, 1]
-    y_cal = y_all[val_mask]
-    lab = y_cal != -1
-    p_np = probs_cal[lab].detach().cpu().numpy()
-    y_np = y_cal[lab].detach().cpu().numpy()
-    best_th, best_f1 = find_optimal_threshold(y_np, p_np, low=low, high=high,
-                                              num_steps=int(round((high - low) / 0.01)) + 1)
-    best_th = min(best_th, float(base_threshold))
-    info['retuned_threshold'] = best_th
-    info['calibration_f1'] = best_f1
 
     if hasattr(tree, 'trees'):
         k = len(tree.trees)
@@ -437,8 +488,30 @@ def get_adaptive_post_drift_threshold(model: EndToEndGNNSoftTree, z_all: torch.T
         majority_th = frac * mean_max + (1.0 - frac) * mean_min - majority_margin
         info.update({'majority_votes': f"{votes}/{k}", 'mean_max_leaf': mean_max,
                      'mean_min_leaf': mean_min, 'majority_threshold': majority_th})
-        best_th = min(best_th, majority_th)
+        floor_th = max(low, majority_th)
+    else:
+        q = torch.softmax(tree.leaf_logits, dim=-1)[:, 1]
+        mean_max, mean_min = float(q.max().item()), float(q.min().item())
+        majority_th = majority_frac * mean_max + (1.0 - majority_frac) * mean_min - majority_margin
+        info.update({'majority_votes': '1/1', 'mean_max_leaf': mean_max,
+                     'mean_min_leaf': mean_min, 'majority_threshold': majority_th})
+        floor_th = max(low, quantile_floor, majority_th)
 
+    probs_cal = model.predict_probs(z_all[val_mask], mode=inference_mode)[:, 1]
+    y_cal = y_all[val_mask]
+    lab = y_cal != -1
+    p_np = probs_cal[lab].detach().cpu().numpy()
+    y_np = y_cal[lab].detach().cpu().numpy()
+    eff_high = max(floor_th, min(high, float(base_threshold)))
+    best_th, best_f1 = find_optimal_threshold(
+        y_np, p_np, low=floor_th, high=eff_high,
+        num_steps=max(2, int(round((eff_high - floor_th) / 0.01)) + 1))
+    best_th = min(best_th, float(base_threshold))
+    info['retuned_threshold'] = best_th
+    info['calibration_f1'] = best_f1
+
+    # Jeśli w kroku t odsetek pozytywnych przy best_th jest poniżej min_pos_rate,
+    # pozwalamy obniżyć próg maksymalnie do progu większościowego 3/5 drzew (floor_th), nigdy do 0.35
     probs_step = model.predict_probs(z_all[current_step_mask], mode=inference_mode)[:, 1]
     info['quantile_relaxed'] = False
     if probs_step.numel() > 0:
@@ -446,9 +519,10 @@ def get_adaptive_post_drift_threshold(model: EndToEndGNNSoftTree, z_all: torch.T
         info['pos_rate_before_floor'] = pos_rate
         if pos_rate < min_pos_rate:
             quantile_th = float(torch.quantile(probs_step.detach().cpu().float(), 1.0 - min_pos_rate).item())
-            relaxed = min(best_th, max(quantile_floor, quantile_th))
+            relaxed = min(best_th, max(floor_th, quantile_th))
             info['quantile_relaxed'] = relaxed < best_th
             best_th = relaxed
+    best_th = max(best_th, floor_th)
 
     final_th = round(float(best_th), 4)
     info['final_threshold'] = final_th
