@@ -1,0 +1,1 @@
+This repository implements a memory-efficient GAT variant (HeadChunkedGATConv) and combines it with a differentiable soft decision tree in an end-to-end trainable model for AML detection on the Elliptic dataset. It includes training loops, ablation studies, continual learning post-drift, and explainability features.
